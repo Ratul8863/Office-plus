@@ -58,7 +58,7 @@ function SimulationPage() {
   const loadPct = Math.min(100, Math.round((usage.totalWatt / (60 * 6 + 15 * 9)) * 100));
   const loadLabel = loadPct > 66 ? "High" : loadPct > 33 ? "Medium" : "Low";
 
-  const [ambient, setAmbient] = useState(22.4);
+  const [activity, setActivity] = useState(58);
   const [occupancy, setOccupancy] = useState(42);
 
   function runPreset(key: (typeof PRESETS)[number]["key"]) {
@@ -80,18 +80,18 @@ function SimulationPage() {
         </div>
         <span className="inline-flex items-center gap-2 rounded-full border border-border/40 bg-card/50 px-3 py-1.5 text-xs">
           <Radio className={`h-3.5 w-3.5 ${wokwi ? "text-emerald-300" : "text-red-300"}`} />
-          <span className="font-mono">{activeCount}</span> Active Nodes · {devices.length} Total
+          <span className="font-mono">{activeCount}</span> Active Devices · {devices.length} Total
         </span>
       </div>
 
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 max-w-3xl">
-          <h1 className="text-4xl font-bold tracking-tight">Environment Simulator</h1>
+          <h1 className="text-4xl font-bold tracking-tight">Operations Control Center</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Manipulate office conditions and individual device states to test automation workflows.{" "}
+            Operator controls for validating device states, alerts, and telemetry behavior across the office.{" "}
             <span className="text-accent">
-              These controls are frontend mock controls. In production, device state will come from
-              the backend through Socket.IO.
+              The frontend currently runs on simulated telemetry and will connect to backend APIs and
+              Socket.IO once the hardware pipeline is live.
             </span>
           </p>
         </div>
