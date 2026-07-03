@@ -41,7 +41,7 @@ function DashboardPage() {
           <p className="text-sm text-muted-foreground">Real-Time Office Energy Intelligence</p>
         </div>
         <div className="text-right text-xs text-muted-foreground font-mono">
-          <div>Now · {formatTime(now)}</div>
+          <div>Now · {now ? formatTime(now) : "--:--:--"}</div>
           <div>Updated · {formatTime(lastUpdated)}</div>
         </div>
       </header>
