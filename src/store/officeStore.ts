@@ -36,9 +36,9 @@ export const useOfficeStore = create<State>((set) => ({
 
   toggleDevice: (id) =>
     set((s) => {
-      const devices = s.devices.map((d) => {
+      const devices: Device[] = s.devices.map((d) => {
         if (d.deviceId !== id) return d;
-        const status = d.status === "on" ? "off" : "on";
+        const status: "on" | "off" = d.status === "on" ? "off" : "on";
         return {
           ...d,
           status,
