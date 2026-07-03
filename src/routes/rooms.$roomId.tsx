@@ -95,7 +95,7 @@ function RoomDetailPage() {
             <div className="mb-4">
               <h2 className="text-xl font-bold">Spatial Layout</h2>
               <p className="text-xs text-muted-foreground">
-                Real-time device positions & thermal overlay
+                Real-time device positions and energy status
               </p>
             </div>
 
