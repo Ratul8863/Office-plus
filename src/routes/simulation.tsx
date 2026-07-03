@@ -149,16 +149,15 @@ function SimulationPage() {
 
         {/* Right rail */}
         <aside className="space-y-4 min-w-0">
-          <Panel icon={Sparkles} title="Environment Variables">
+          <Panel icon={Sparkles} title="Control Signals">
             <div className="space-y-5">
               <SliderRow
-                label="Ambient Temperature"
-                value={`${ambient.toFixed(1)}°C`}
-                min={16}
-                max={32}
-                step={0.1}
-                v={ambient}
-                onChange={setAmbient}
+                label="Office Activity Level"
+                value={`${activity}%`}
+                min={0}
+                max={100}
+                v={activity}
+                onChange={setActivity}
               />
               <SliderRow
                 label="Occupancy Level"
@@ -168,6 +167,17 @@ function SimulationPage() {
                 v={occupancy}
                 onChange={setOccupancy}
               />
+              <div className="flex items-center justify-between rounded-lg border border-border/40 bg-background/40 px-3 py-2 text-sm">
+                <span className="text-muted-foreground">Simulator Mode</span>
+                <span className="font-mono text-accent">Simulated telemetry</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-border/40 bg-background/40 px-3 py-2 text-sm">
+                <span className="text-muted-foreground">Wokwi Connection</span>
+                <span className={`inline-flex items-center gap-1.5 font-mono ${wokwi ? "text-emerald-300" : "text-red-300"}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${wokwi ? "bg-emerald-300" : "bg-red-300"}`} />
+                  {wokwi ? "Connected" : "Disconnected"}
+                </span>
+              </div>
               <div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Estimated Load</span>
@@ -211,11 +221,12 @@ function SimulationPage() {
                   <BrainCircuit className="h-6 w-6 text-accent" />
                 </div>
                 <div className="mt-4 text-sm font-bold uppercase tracking-widest text-accent">
-                  Mock Stream Active
+                  Telemetry Stream Active
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Simulation logic interpreting device state changes in real time. Backend Socket.IO
-                  connection will replace this in production.
+                  Scenario control logic interpreting device state changes in real time. Backend
+                  APIs and Socket.IO will stream live telemetry once the hardware pipeline is
+                  connected.
                 </p>
                 <div className="mt-4 grid grid-cols-3 gap-2 w-full">
                   {Object.entries(ROOM_META).map(([id, m]) => (

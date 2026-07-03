@@ -113,7 +113,7 @@ export const useOfficeStore = create<State>((set) => ({
         HIGH_USAGE: {
           type: "HIGH_USAGE",
           severity: "critical",
-          message: "Current usage is above the safe demo threshold.",
+          message: "Current usage is above the safe operating threshold.",
         },
         DEVICE_OFFLINE: {
           type: "DEVICE_OFFLINE",
