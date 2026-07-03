@@ -13,7 +13,8 @@ const ROOM_IDS: RoomId[] = ["drawing", "work1", "work2"];
 
 function RoomsPage() {
   const devices = useOfficeStore((s) => s.devices);
-  const alerts = useOfficeStore((s) => s.alerts.filter((a) => a.active));
+  const allAlerts = useOfficeStore((s) => s.alerts);
+  const alerts = allAlerts.filter((a) => a.active);
 
   return (
     <div className="p-4 lg:p-8 space-y-6">

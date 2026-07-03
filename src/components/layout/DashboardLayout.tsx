@@ -24,7 +24,8 @@ const NAV = [
 export function DashboardLayout() {
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const activeAlerts = useOfficeStore((s) => s.alerts.filter((a) => a.active).length);
+  const alerts = useOfficeStore((s) => s.alerts);
+  const activeAlerts = alerts.filter((a) => a.active).length;
   const wokwi = useOfficeStore((s) => s.wokwiConnected);
 
   useEffect(() => setOpen(false), [pathname]);

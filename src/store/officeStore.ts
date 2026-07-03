@@ -32,7 +32,7 @@ export const useOfficeStore = create<State>((set) => ({
   alerts: initialAlerts,
   activity: initialActivity,
   wokwiConnected: true,
-  lastUpdated: new Date().toISOString(),
+  lastUpdated: initialDevices[0]?.lastChanged ?? "2026-07-03T14:30:00.000Z",
 
   toggleDevice: (id) =>
     set((s) => {

@@ -1,9 +1,15 @@
 import type { Device, RoomId, Alert, ActivityEvent } from "@/types";
 import { FAN_WATT, LIGHT_WATT, ROOM_META } from "@/utils/office";
 
+const DEMO_NOW = Date.UTC(2026, 6, 3, 14, 30, 0);
+
+function demoIso(minutesAgo = 0, secondsAgo = 0) {
+  return new Date(DEMO_NOW - minutesAgo * 60_000 - secondsAgo * 1000).toISOString();
+}
+
 function makeRoomDevices(roomId: RoomId): Device[] {
   const meta = ROOM_META[roomId];
-  const now = new Date().toISOString();
+  const now = demoIso();
   const list: Device[] = [];
   for (let i = 1; i <= 2; i++) {
     list.push({
@@ -44,7 +50,7 @@ export const initialDevices: Device[] = [
   // seed a plausible starting state (about half on)
   const on = [0, 2, 5, 6, 8, 10, 12].includes(idx);
   return on
-    ? { ...d, status: "on" as const, currentWatt: d.ratedWatt, onSince: new Date(Date.now() - 1000 * 60 * 45).toISOString() }
+    ? { ...d, status: "on" as const, currentWatt: d.ratedWatt, onSince: demoIso(45) }
     : d;
 });
 
@@ -56,7 +62,7 @@ export const initialAlerts: Alert[] = [
     roomId: "work2",
     message: "Work Room 2 still has 2 fans and 3 lights ON after office hours.",
     active: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
+    createdAt: demoIso(12),
   },
   {
     alertId: "a2",
@@ -65,7 +71,7 @@ export const initialAlerts: Alert[] = [
     roomId: "drawing",
     message: "Drawing Room has all devices ON for more than 2 hours.",
     active: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 130).toISOString(),
+    createdAt: demoIso(130),
   },
   {
     alertId: "a3",
@@ -73,8 +79,8 @@ export const initialAlerts: Alert[] = [
     severity: "critical",
     message: "Current usage is above the safe demo threshold.",
     active: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 240).toISOString(),
-    resolvedAt: new Date(Date.now() - 1000 * 60 * 210).toISOString(),
+    createdAt: demoIso(240),
+    resolvedAt: demoIso(210),
   },
 ];
 
@@ -84,20 +90,20 @@ export const initialActivity: ActivityEvent[] = [
     type: "TELEMETRY_RECEIVED",
     message: "Wokwi telemetry received for Work Room 1",
     roomId: "work1",
-    createdAt: new Date(Date.now() - 1000 * 20).toISOString(),
+    createdAt: demoIso(0, 20),
   },
   {
     eventId: "e2",
     type: "ALERT_CREATED",
     message: "After-hours alert raised for Work Room 2",
     roomId: "work2",
-    createdAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
+    createdAt: demoIso(12),
   },
   {
     eventId: "e3",
     type: "DEVICE_CHANGED",
     message: "Drawing Room Light 2 turned ON",
     roomId: "drawing",
-    createdAt: new Date(Date.now() - 1000 * 60 * 3).toISOString(),
+    createdAt: demoIso(3),
   },
 ];
