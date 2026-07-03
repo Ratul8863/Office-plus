@@ -17,9 +17,10 @@ export const Route = createFileRoute("/")({
 function DashboardPage() {
   const lastUpdated = useOfficeStore((s) => s.lastUpdated);
   const tick = useOfficeStore((s) => s.tick);
-  const [now, setNow] = useState(() => new Date().toISOString());
+  const [now, setNow] = useState<string | null>(null);
 
   useEffect(() => {
+    setNow(new Date().toISOString());
     const id = setInterval(() => {
       setNow(new Date().toISOString());
       tick();
@@ -40,7 +41,7 @@ function DashboardPage() {
           <p className="text-sm text-muted-foreground">Real-Time Office Energy Intelligence</p>
         </div>
         <div className="text-right text-xs text-muted-foreground font-mono">
-          <div>Now · {formatTime(now)}</div>
+          <div>Now · {now ? formatTime(now) : "--:--:--"}</div>
           <div>Updated · {formatTime(lastUpdated)}</div>
         </div>
       </header>
