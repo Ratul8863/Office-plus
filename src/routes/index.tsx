@@ -17,9 +17,10 @@ export const Route = createFileRoute("/")({
 function DashboardPage() {
   const lastUpdated = useOfficeStore((s) => s.lastUpdated);
   const tick = useOfficeStore((s) => s.tick);
-  const [now, setNow] = useState(() => new Date().toISOString());
+  const [now, setNow] = useState<string | null>(null);
 
   useEffect(() => {
+    setNow(new Date().toISOString());
     const id = setInterval(() => {
       setNow(new Date().toISOString());
       tick();
