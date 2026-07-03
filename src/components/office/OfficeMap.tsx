@@ -5,7 +5,8 @@ import { DeviceIcon } from "./DeviceIcon";
 import { formatWatt } from "@/utils/office";
 
 function RoomBlock({ roomId, devices }: { roomId: RoomId; devices: Device[] }) {
-  const alerts = useOfficeStore((s) => s.alerts.filter((a) => a.active && a.roomId === roomId));
+  const allAlerts = useOfficeStore((s) => s.alerts);
+  const alerts = allAlerts.filter((a) => a.active && a.roomId === roomId);
   const summary = getRoomSummary(devices, roomId);
   const roomDevices = devices.filter((d) => d.roomId === roomId);
   const fans = roomDevices.filter((d) => d.type === "fan");
