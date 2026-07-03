@@ -4,7 +4,8 @@ import { computeUsage, formatKwh, formatWatt } from "@/utils/office";
 
 export function SummaryCards() {
   const devices = useOfficeStore((s) => s.devices);
-  const alerts = useOfficeStore((s) => s.alerts.filter((a) => a.active).length);
+  const allAlerts = useOfficeStore((s) => s.alerts);
+  const alerts = allAlerts.filter((a) => a.active).length;
   const wokwi = useOfficeStore((s) => s.wokwiConnected);
   const usage = computeUsage(devices);
 

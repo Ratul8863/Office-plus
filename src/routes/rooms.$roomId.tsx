@@ -27,18 +27,19 @@ function RoomDetailPage() {
   const { roomId } = Route.useParams();
   const rid = roomId as RoomId;
   const devices = useOfficeStore((s) => s.devices);
-  const alerts = useOfficeStore((s) => s.alerts.filter((a) => a.roomId === rid));
+  const allAlerts = useOfficeStore((s) => s.alerts);
   const toggle = useOfficeStore((s) => s.toggleDevice);
   const summary = getRoomSummary(devices, rid);
   const meta = ROOM_META[rid];
   const roomDevices = useMemo(() => devices.filter((d) => d.roomId === rid), [devices, rid]);
+  const alerts = useMemo(() => allAlerts.filter((a) => a.roomId === rid), [allAlerts, rid]);
   const fans = roomDevices.filter((d) => d.type === "fan");
   const lights = roomDevices.filter((d) => d.type === "light");
 
   const [trend, setTrend] = useState<{ t: string; w: number }[]>(() =>
     Array.from({ length: 14 }, (_, i) => ({
       t: `${i}h`,
-      w: Math.max(15, summary.currentWatt * (0.4 + Math.random() * 0.8)),
+      w: Math.max(15, summary.currentWatt * (0.55 + (i % 5) * 0.09)),
     })),
   );
 
