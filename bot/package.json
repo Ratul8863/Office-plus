@@ -1,0 +1,18 @@
+{
+  "name": "office-pulse-bot",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "axios": "^1.5.0",
+    "discord.js": "^14.15.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.10.0",
+    "typescript": "^5.8.3"
+  }
+}
