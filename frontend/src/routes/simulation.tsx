@@ -53,8 +53,9 @@ function SimulationPage() {
   const simulateWokwiDisconnect = useOfficeStore((s) => s.simulateWokwiDisconnect);
   const wokwi = useOfficeStore((s) => s.wokwiConnected);
 
-  const activeCount = devices.filter((d) => d.status === "on").length;
-  const usage = useMemo(() => computeUsage(devices), [devices]);
+  const storeUsage = useOfficeStore((s) => s.usage);
+  const usage = useMemo(() => storeUsage || computeUsage(devices), [devices, storeUsage]);
+  const activeCount = usage.activeDeviceCount;
   const loadPct = Math.min(100, Math.round((usage.totalWatt / (60 * 6 + 15 * 9)) * 100));
   const loadLabel = loadPct > 66 ? "High" : loadPct > 33 ? "Medium" : "Low";
 

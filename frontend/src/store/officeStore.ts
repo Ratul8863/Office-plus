@@ -1,7 +1,9 @@
 import { create } from "zustand";
-import type { Alert, ActivityEvent, Device, RoomId } from "@/types";
+import type { Alert, ActivityEvent, Device, RoomId, Usage } from "@/types";
 import { initialActivity, initialAlerts, initialDevices } from "@/data/mockOfficeState";
 import { FAN_WATT, LIGHT_WATT, ROOM_META } from "@/utils/office";
+import { officeApi } from "@/services/officeApi";
+import { toast } from "sonner";
 
 interface State {
   devices: Device[];
@@ -9,7 +11,24 @@ interface State {
   activity: ActivityEvent[];
   wokwiConnected: boolean;
   lastUpdated: string;
-  toggleDevice: (id: string) => void;
+  
+  // Backend and real-time statuses
+  backendConnected: boolean;
+  socketConnected: boolean;
+  usage: Usage | null;
+
+  // Setters to ingest API and Socket data
+  setDevices: (devices: Device[]) => void;
+  updateSingleDevice: (device: Device) => void;
+  setAlerts: (alerts: Alert[]) => void;
+  addAlert: (alert: Alert) => void;
+  setUsage: (usage: any) => void;
+  setWokwiConnected: (connected: boolean) => void;
+  setBackendConnected: (connected: boolean) => void;
+  setSocketConnected: (connected: boolean) => void;
+
+  // Handlers
+  toggleDevice: (id: string) => Promise<void>;
   setDeviceStatus: (id: string, status: "on" | "off") => void;
   randomize: () => void;
   triggerAlert: (type: Alert["type"]) => void;
@@ -27,38 +46,151 @@ function pushActivity(state: State, ev: Omit<ActivityEvent, "eventId" | "created
   ].slice(0, 40);
 }
 
-export const useOfficeStore = create<State>((set) => ({
+export const useOfficeStore = create<State>((set, get) => ({
   devices: initialDevices,
   alerts: initialAlerts,
   activity: initialActivity,
   wokwiConnected: true,
-  lastUpdated: initialDevices[0]?.lastChanged ?? "2026-07-03T14:30:00.000Z",
+  lastUpdated: initialDevices[0]?.lastChanged ?? new Date().toISOString(),
+  backendConnected: false,
+  socketConnected: false,
+  usage: null,
 
-  toggleDevice: (id) =>
+  setDevices: (devices) =>
+    set({
+      devices,
+      lastUpdated: new Date().toISOString(),
+    }),
+
+  updateSingleDevice: (device) =>
     set((s) => {
-      const devices: Device[] = s.devices.map((d) => {
-        if (d.deviceId !== id) return d;
-        const status: "on" | "off" = d.status === "on" ? "off" : "on";
-        return {
-          ...d,
-          status,
-          currentWatt: status === "on" ? d.ratedWatt : 0,
-          lastChanged: new Date().toISOString(),
-          onSince: status === "on" ? new Date().toISOString() : undefined,
-        };
-      });
-      const d = devices.find((x) => x.deviceId === id)!;
-      return {
-        devices,
-        lastUpdated: new Date().toISOString(),
-        activity: pushActivity(s, {
+      const prevDevice = s.devices.find((d) => d.deviceId === device.deviceId);
+      const updatedDevices = s.devices.map((d) =>
+        d.deviceId === device.deviceId ? device : d
+      );
+
+      let activity = s.activity;
+      if (prevDevice && prevDevice.status !== device.status) {
+        activity = pushActivity(s, {
           type: "DEVICE_CHANGED",
-          message: `${d.roomName} ${d.name} turned ${d.status.toUpperCase()}`,
-          roomId: d.roomId,
-          deviceId: id,
+          message: `${device.roomName} ${device.name} turned ${device.status.toUpperCase()}`,
+          roomId: device.roomId,
+          deviceId: device.deviceId,
+        });
+      }
+
+      return {
+        devices: updatedDevices,
+        lastUpdated: new Date().toISOString(),
+        activity,
+      };
+    }),
+
+  setAlerts: (alerts) => set({ alerts }),
+
+  addAlert: (alert) =>
+    set((s) => {
+      const exists = s.alerts.some((a) => a.alertId === alert.alertId);
+      if (exists) return {};
+
+      return {
+        alerts: [alert, ...s.alerts],
+        activity: pushActivity(s, {
+          type: "ALERT_CREATED",
+          message: alert.message,
+          roomId: alert.roomId,
         }),
       };
     }),
+
+  setUsage: (usageData) =>
+    set((s) => {
+      const roomWatts = { drawing: 0, work1: 0, work2: 0 };
+      if (usageData && Array.isArray(usageData.rooms)) {
+        usageData.rooms.forEach((r: any) => {
+          if (r.roomId === "drawing" || r.roomId === "work1" || r.roomId === "work2") {
+            roomWatts[r.roomId as RoomId] = r.totalWatt;
+          }
+        });
+      }
+      return {
+        usage: usageData
+          ? {
+              totalWatt: usageData.totalWatt,
+              estimatedKwhToday: usageData.estimatedKwhToday,
+              roomWatts,
+              activeDeviceCount: usageData.activeDeviceCount,
+            }
+          : null,
+      };
+    }),
+
+  setWokwiConnected: (connected) =>
+    set((s) => {
+      const changed = s.wokwiConnected !== connected;
+      return {
+        wokwiConnected: connected,
+        activity: changed
+          ? pushActivity(s, {
+              type: "SYSTEM",
+              message: connected ? "Wokwi Gateway connected" : "Wokwi Gateway went offline",
+              roomId: "work1",
+            })
+          : s.activity,
+      };
+    }),
+
+  setBackendConnected: (connected) => set({ backendConnected: connected }),
+
+  setSocketConnected: (connected) => set({ socketConnected: connected }),
+
+  toggleDevice: async (id) => {
+    const state = get();
+    const d = state.devices.find((x) => x.deviceId === id);
+    if (!d) return;
+
+    if (state.backendConnected) {
+      if (d.source === "wokwi" || d.roomId === "work1") {
+        toast.error(`Device "${d.name}" in Work Room 1 is managed via Wokwi telemetry and cannot be controlled directly.`);
+        return;
+      }
+
+      try {
+        console.log(`[Store] API toggling device: ${id}`);
+        const updatedDevice = await officeApi.toggleDevice(id);
+        get().updateSingleDevice(updatedDevice);
+      } catch (err: any) {
+        console.error("[Store] Failed to toggle device via backend API:", err.message);
+        toast.error(`Failed to control device: ${err.message}`);
+      }
+    } else {
+      // Mock toggle fallback (demo mode)
+      set((s) => {
+        const devices: Device[] = s.devices.map((item) => {
+          if (item.deviceId !== id) return item;
+          const status: "on" | "off" = item.status === "on" ? "off" : "on";
+          return {
+            ...item,
+            status,
+            currentWatt: status === "on" ? item.ratedWatt : 0,
+            lastChanged: new Date().toISOString(),
+            onSince: status === "on" ? new Date().toISOString() : undefined,
+          };
+        });
+        const target = devices.find((x) => x.deviceId === id)!;
+        return {
+          devices,
+          lastUpdated: new Date().toISOString(),
+          activity: pushActivity(s, {
+            type: "DEVICE_CHANGED",
+            message: `${target.roomName} ${target.name} turned ${target.status.toUpperCase()} (Demo Mode)`,
+            roomId: target.roomId,
+            deviceId: id,
+          }),
+        };
+      });
+    }
+  },
 
   setDeviceStatus: (id, status) =>
     set((s) => ({
@@ -71,7 +203,7 @@ export const useOfficeStore = create<State>((set) => ({
               lastChanged: new Date().toISOString(),
               onSince: status === "on" ? new Date().toISOString() : undefined,
             }
-          : d,
+          : d
       ),
       lastUpdated: new Date().toISOString(),
     })),
@@ -146,9 +278,26 @@ export const useOfficeStore = create<State>((set) => ({
   reconnectWokwi: () => set({ wokwiConnected: true }),
 
   resolveAlert: (id) =>
-    set((s) => ({
-      alerts: s.alerts.map((a) => (a.alertId === id ? { ...a, active: false, resolvedAt: new Date().toISOString() } : a)),
-    })),
+    set((s) => {
+      const alert = s.alerts.find((a) => a.alertId === id);
+      const updatedAlerts = s.alerts.map((a) =>
+        a.alertId === id ? { ...a, active: false, resolvedAt: new Date().toISOString() } : a
+      );
+      
+      let activity = s.activity;
+      if (alert && alert.active) {
+        activity = pushActivity(s, {
+          type: "SYSTEM",
+          message: `Alert resolved: ${alert.message}`,
+          roomId: alert.roomId,
+        });
+      }
+
+      return {
+        alerts: updatedAlerts,
+        activity,
+      };
+    }),
 
   reset: () =>
     set({
@@ -157,6 +306,9 @@ export const useOfficeStore = create<State>((set) => ({
       activity: initialActivity,
       wokwiConnected: true,
       lastUpdated: new Date().toISOString(),
+      backendConnected: false,
+      socketConnected: false,
+      usage: null,
     }),
 
   tick: () => set({ lastUpdated: new Date().toISOString() }),

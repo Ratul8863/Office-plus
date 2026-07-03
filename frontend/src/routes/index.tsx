@@ -16,6 +16,7 @@ export const Route = createFileRoute("/")({
 
 function DashboardPage() {
   const lastUpdated = useOfficeStore((s) => s.lastUpdated);
+  const backendConnected = useOfficeStore((s) => s.backendConnected);
   const tick = useOfficeStore((s) => s.tick);
   const [now, setNow] = useState<string | null>(null);
 
@@ -33,7 +34,11 @@ function DashboardPage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Chip icon={Server} tone="emerald" label="Live Backend" />
+            {backendConnected ? (
+              <Chip icon={Server} tone="emerald" label="Live Backend" />
+            ) : (
+              <Chip icon={Server} tone="destructive" label="Backend Disconnected (Demo)" />
+            )}
             <Chip icon={Radio} tone="cyan" label="Wokwi + Simulator" />
             <Chip icon={Zap} tone="primary" label="Single Source of Truth" />
           </div>
@@ -63,11 +68,12 @@ function DashboardPage() {
   );
 }
 
-function Chip({ icon: Icon, tone, label }: { icon: typeof Zap; tone: "emerald" | "cyan" | "primary"; label: string }) {
+function Chip({ icon: Icon, tone, label }: { icon: typeof Zap; tone: "emerald" | "cyan" | "primary" | "destructive"; label: string }) {
   const styles = {
     emerald: "border-emerald-400/40 bg-emerald-500/10 text-emerald-200",
     cyan: "border-cyan-400/40 bg-cyan-500/10 text-cyan-200",
     primary: "border-primary/40 bg-primary/10 text-primary",
+    destructive: "border-destructive/40 bg-destructive/10 text-destructive",
   }[tone];
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium ${styles}`}>

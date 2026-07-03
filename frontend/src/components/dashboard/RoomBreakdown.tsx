@@ -4,7 +4,8 @@ import { computeUsage } from "@/utils/office";
 
 export function RoomBreakdown() {
   const devices = useOfficeStore((s) => s.devices);
-  const usage = computeUsage(devices);
+  const storeUsage = useOfficeStore((s) => s.usage);
+  const usage = storeUsage || computeUsage(devices);
   const data = [
     { room: "Drawing", watts: usage.roomWatts.drawing },
     { room: "Work 1", watts: usage.roomWatts.work1 },

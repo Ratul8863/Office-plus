@@ -12,6 +12,10 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useOfficeStore } from "@/store/officeStore";
+import { initSocket, disconnectSocket } from "@/services/socketClient";
+import { officeApi } from "@/services/officeApi";
+import { usageApi } from "@/services/usageApi";
+import { alertApi } from "@/services/alertApi";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
@@ -24,11 +28,64 @@ const NAV = [
 export function DashboardLayout() {
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  
   const alerts = useOfficeStore((s) => s.alerts);
   const activeAlerts = alerts.filter((a) => a.active).length;
   const wokwi = useOfficeStore((s) => s.wokwiConnected);
+  const backendConnected = useOfficeStore((s) => s.backendConnected);
+  const socketConnected = useOfficeStore((s) => s.socketConnected);
 
   useEffect(() => setOpen(false), [pathname]);
+
+  // Initial sync and Socket.IO initialization on mount
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        console.log("[DashboardLayout] Fetching initial state from backend...");
+        const devices = await officeApi.getState();
+        const usage = await usageApi.getUsage();
+        const activeAlertsData = await alertApi.getAlerts();
+
+        const store = useOfficeStore.getState();
+        store.setDevices(devices);
+        store.setUsage(usage);
+
+        // Map backend alerts to the frontend structure
+        const mappedAlerts = activeAlertsData.map((a: any) => ({
+          alertId: a.id,
+          type: a.type,
+          severity: a.severity,
+          roomId: a.roomId,
+          deviceId: a.deviceId,
+          message: a.message,
+          active: a.status === "active",
+          createdAt: a.triggeredAt,
+          resolvedAt: a.resolvedAt || undefined,
+        }));
+        store.setAlerts(mappedAlerts);
+        
+        // Mark backend as reachable
+        store.setBackendConnected(true);
+        console.log("[DashboardLayout] Backend connected and initial data loaded.");
+      } catch (err: any) {
+        console.warn(
+          "[DashboardLayout] Backend unreachable, falling back to mock data:",
+          err.message
+        );
+        useOfficeStore.getState().setBackendConnected(false);
+      }
+    };
+
+    fetchInitialData();
+
+    // Establish WebSocket connection
+    initSocket();
+
+    return () => {
+      console.log("[DashboardLayout] Cleaning up Socket.IO connection...");
+      disconnectSocket();
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground bg-grid">
@@ -96,14 +153,37 @@ export function DashboardLayout() {
 
             <div className="mt-auto space-y-2 rounded-xl border border-border/40 bg-background/40 p-3 text-xs">
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Backend</span>
-                <span className="flex items-center gap-1.5 text-emerald-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Live
+                <span className="text-muted-foreground">API Server</span>
+                <span
+                  className={`flex items-center gap-1.5 ${
+                    backendConnected ? "text-emerald-400" : "text-destructive"
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      backendConnected ? "bg-emerald-400 animate-pulse" : "bg-destructive"
+                    }`}
+                  />
+                  {backendConnected ? "Connected" : "Disconnected"}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Wokwi</span>
+                <span className="text-muted-foreground">Real-Time Socket</span>
+                <span
+                  className={`flex items-center gap-1.5 ${
+                    socketConnected ? "text-emerald-400" : "text-destructive"
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      socketConnected ? "bg-emerald-400 animate-pulse" : "bg-destructive"
+                    }`}
+                  />
+                  {socketConnected ? "Connected" : "Disconnected"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Wokwi (Work 1)</span>
                 <span
                   className={`flex items-center gap-1.5 ${
                     wokwi ? "text-cyan-400" : "text-destructive"
@@ -114,14 +194,18 @@ export function DashboardLayout() {
                       wokwi ? "bg-cyan-400 animate-pulse" : "bg-destructive"
                     }`}
                   />
-                  {wokwi ? "Connected" : "Offline"}
+                  {wokwi ? "Online" : "Offline"}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Simulator</span>
-                <span className="flex items-center gap-1.5 text-emerald-400">
-                  <Activity className="h-3 w-3" />
-                  Active
+                <span
+                  className={`flex items-center gap-1.5 ${
+                    backendConnected ? "text-emerald-400" : "text-muted-foreground"
+                  }`}
+                >
+                  <Activity className="h-3 w-3 animate-pulse" />
+                  {backendConnected ? "Active" : "Inactive"}
                 </span>
               </div>
             </div>
@@ -143,3 +227,4 @@ export function DashboardLayout() {
     </div>
   );
 }
+export default DashboardLayout;
