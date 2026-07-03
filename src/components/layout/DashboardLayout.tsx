@@ -2,6 +2,7 @@ import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
   Activity,
   AlertTriangle,
+  DoorOpen,
   LayoutDashboard,
   Menu,
   Network,
@@ -14,6 +15,7 @@ import { useOfficeStore } from "@/store/officeStore";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { to: "/rooms", label: "Rooms", icon: DoorOpen },
   { to: "/alerts", label: "Alerts", icon: AlertTriangle },
   { to: "/architecture", label: "Architecture", icon: Network },
   { to: "/simulation", label: "Simulation", icon: Sliders },
