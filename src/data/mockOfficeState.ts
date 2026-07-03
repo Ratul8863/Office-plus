@@ -77,7 +77,7 @@ export const initialAlerts: Alert[] = [
     alertId: "a3",
     type: "HIGH_USAGE",
     severity: "critical",
-    message: "Current usage is above the safe demo threshold.",
+    message: "Current usage is above the safe operating threshold.",
     active: false,
     createdAt: demoIso(240),
     resolvedAt: demoIso(210),

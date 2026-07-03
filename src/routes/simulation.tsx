@@ -58,7 +58,7 @@ function SimulationPage() {
   const loadPct = Math.min(100, Math.round((usage.totalWatt / (60 * 6 + 15 * 9)) * 100));
   const loadLabel = loadPct > 66 ? "High" : loadPct > 33 ? "Medium" : "Low";
 
-  const [ambient, setAmbient] = useState(22.4);
+  const [activity, setActivity] = useState(58);
   const [occupancy, setOccupancy] = useState(42);
 
   function runPreset(key: (typeof PRESETS)[number]["key"]) {
@@ -80,18 +80,18 @@ function SimulationPage() {
         </div>
         <span className="inline-flex items-center gap-2 rounded-full border border-border/40 bg-card/50 px-3 py-1.5 text-xs">
           <Radio className={`h-3.5 w-3.5 ${wokwi ? "text-emerald-300" : "text-red-300"}`} />
-          <span className="font-mono">{activeCount}</span> Active Nodes · {devices.length} Total
+          <span className="font-mono">{activeCount}</span> Active Devices · {devices.length} Total
         </span>
       </div>
 
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 max-w-3xl">
-          <h1 className="text-4xl font-bold tracking-tight">Environment Simulator</h1>
+          <h1 className="text-4xl font-bold tracking-tight">Operations Control Center</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Manipulate office conditions and individual device states to test automation workflows.{" "}
+            Operator controls for validating device states, alerts, and telemetry behavior across the office.{" "}
             <span className="text-accent">
-              These controls are frontend mock controls. In production, device state will come from
-              the backend through Socket.IO.
+              The frontend currently runs on simulated telemetry and will connect to backend APIs and
+              Socket.IO once the hardware pipeline is live.
             </span>
           </p>
         </div>
@@ -149,16 +149,15 @@ function SimulationPage() {
 
         {/* Right rail */}
         <aside className="space-y-4 min-w-0">
-          <Panel icon={Sparkles} title="Environment Variables">
+          <Panel icon={Sparkles} title="Control Signals">
             <div className="space-y-5">
               <SliderRow
-                label="Ambient Temperature"
-                value={`${ambient.toFixed(1)}°C`}
-                min={16}
-                max={32}
-                step={0.1}
-                v={ambient}
-                onChange={setAmbient}
+                label="Office Activity Level"
+                value={`${activity}%`}
+                min={0}
+                max={100}
+                v={activity}
+                onChange={setActivity}
               />
               <SliderRow
                 label="Occupancy Level"
@@ -168,6 +167,17 @@ function SimulationPage() {
                 v={occupancy}
                 onChange={setOccupancy}
               />
+              <div className="flex items-center justify-between rounded-lg border border-border/40 bg-background/40 px-3 py-2 text-sm">
+                <span className="text-muted-foreground">Simulator Mode</span>
+                <span className="font-mono text-accent">Simulated telemetry</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-border/40 bg-background/40 px-3 py-2 text-sm">
+                <span className="text-muted-foreground">Wokwi Connection</span>
+                <span className={`inline-flex items-center gap-1.5 font-mono ${wokwi ? "text-emerald-300" : "text-red-300"}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${wokwi ? "bg-emerald-300" : "bg-red-300"}`} />
+                  {wokwi ? "Connected" : "Disconnected"}
+                </span>
+              </div>
               <div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Estimated Load</span>
@@ -211,11 +221,12 @@ function SimulationPage() {
                   <BrainCircuit className="h-6 w-6 text-accent" />
                 </div>
                 <div className="mt-4 text-sm font-bold uppercase tracking-widest text-accent">
-                  Mock Stream Active
+                  Telemetry Stream Active
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Simulation logic interpreting device state changes in real time. Backend Socket.IO
-                  connection will replace this in production.
+                  Scenario control logic interpreting device state changes in real time. Backend
+                  APIs and Socket.IO will stream live telemetry once the hardware pipeline is
+                  connected.
                 </p>
                 <div className="mt-4 grid grid-cols-3 gap-2 w-full">
                   {Object.entries(ROOM_META).map(([id, m]) => (
