@@ -1,4 +1,4 @@
-import type { UsageResponse } from "../api/backendClient";
+import type { UsageResponse } from "../api/backendClient.js";
 
 /**
  * Format the office-wide usage report. All numeric values come directly

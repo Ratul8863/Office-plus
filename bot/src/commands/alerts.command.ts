@@ -1,5 +1,5 @@
-import { getBackendClient } from "../api/backendClient";
-import { formatAlerts } from "../formatters/alertFormatter";
+import { getBackendClient } from "../api/backendClient.js";
+import { formatAlerts } from "../formatters/alertFormatter.js";
 
 export const alertsCommand = {
   name: "alerts",

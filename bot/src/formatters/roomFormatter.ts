@@ -1,4 +1,4 @@
-import type { RoomSummary, Alert } from "../api/backendClient";
+import type { RoomSummary, Alert } from "../api/backendClient.js";
 
 /**
  * Format a single-room report. Numbers come straight from /api/rooms/:id

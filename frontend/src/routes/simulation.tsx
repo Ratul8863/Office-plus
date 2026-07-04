@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   BrainCircuit,
@@ -18,6 +18,8 @@ import {
 import { useOfficeStore } from "@/store/officeStore";
 import { computeUsage, ROOM_META } from "@/utils/office";
 import type { Device } from "@/types";
+import { simulatorApi, type SimulatorStatus } from "@/services/simulatorApi";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/simulation")({
   component: SimulationPage,
@@ -53,6 +55,76 @@ function SimulationPage() {
   const simulateWokwiDisconnect = useOfficeStore((s) => s.simulateWokwiDisconnect);
   const wokwi = useOfficeStore((s) => s.wokwiConnected);
 
+  // Auto simulation (backend-driven, optional)
+  const [simStatus, setSimStatus] = useState<SimulatorStatus | null>(null);
+  const [simBusy, setSimBusy] = useState(false);
+
+  const refreshSimStatus = useCallback(async () => {
+    try {
+      const status = await simulatorApi.getStatus();
+      setSimStatus(status);
+    } catch {
+      setSimStatus(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshSimStatus();
+    const id = setInterval(refreshSimStatus, 3000);
+    return () => clearInterval(id);
+  }, [refreshSimStatus]);
+
+  async function startAutoSimulation() {
+    if (simBusy) return;
+    setSimBusy(true);
+    try {
+      const result = await simulatorApi.start();
+      toast.success(
+        result.started
+          ? `Auto simulation started (every ${Math.round((result.intervalMs ?? 8000) / 1000)}s)`
+          : `Auto simulation: ${result.reason ?? "not started"}`
+      );
+      await refreshSimStatus();
+    } catch (err: any) {
+      toast.error(`Could not start auto simulation: ${err?.message ?? err}`);
+    } finally {
+      setSimBusy(false);
+    }
+  }
+
+  async function stopAutoSimulation() {
+    if (simBusy) return;
+    setSimBusy(true);
+    try {
+      await simulatorApi.stop();
+      toast.success("Auto simulation stopped.");
+      await refreshSimStatus();
+    } catch (err: any) {
+      toast.error(`Could not stop auto simulation: ${err?.message ?? err}`);
+    } finally {
+      setSimBusy(false);
+    }
+  }
+
+  async function triggerOneTick() {
+    if (simBusy) return;
+    setSimBusy(true);
+    try {
+      const result = await simulatorApi.toggleRandom();
+      if (result.tick) {
+        toast.success(`Toggled ${result.tick.deviceId} → ${result.tick.newStatus.toUpperCase()}`);
+      } else {
+        toast.error("No simulator devices available to toggle.");
+      }
+      await refreshSimStatus();
+    } catch (err: any) {
+      toast.error(`Tick failed: ${err?.message ?? err}`);
+    } finally {
+      setSimBusy(false);
+    }
+  }
+
+  const backendConnected = useOfficeStore((s) => s.backendConnected);
   const storeUsage = useOfficeStore((s) => s.usage);
   const usage = useMemo(() => storeUsage || computeUsage(devices), [devices, storeUsage]);
   const activeCount = usage.activeDeviceCount;
@@ -91,8 +163,8 @@ function SimulationPage() {
           <p className="mt-2 text-sm text-muted-foreground">
             Operator controls for validating device states, alerts, and telemetry behavior across the office.{" "}
             <span className="text-accent">
-              The frontend currently runs on simulated telemetry and will connect to backend APIs and
-              Socket.IO once the hardware pipeline is live.
+              Operator controls are connected to the OfficePulse backend. Simulator controls validate
+              device states, alerts, and telemetry behavior.
             </span>
           </p>
         </div>
@@ -121,6 +193,63 @@ function SimulationPage() {
                 </button>
               ))}
             </div>
+          </Panel>
+
+          {/* Auto Simulation control */}
+          <Panel icon={Zap} title="Auto Simulation">
+            <div className="grid gap-3 sm:grid-cols-[auto_1fr] sm:items-center">
+              <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-background/40 px-3 py-2 text-sm">
+                <span className="text-muted-foreground">Auto Simulation</span>
+                <span
+                  className={`inline-flex items-center gap-1.5 font-mono ${
+                    simStatus?.autoRunning ? "text-emerald-300" : "text-muted-foreground"
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      simStatus?.autoRunning
+                        ? "bg-emerald-300 animate-pulse"
+                        : "bg-muted-foreground"
+                    }`}
+                  />
+                  {simStatus ? (simStatus.autoRunning ? "ON" : "OFF") : "…"}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={startAutoSimulation}
+                  disabled={simBusy || simStatus?.autoRunning}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-200 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Start Auto
+                </button>
+                <button
+                  onClick={stopAutoSimulation}
+                  disabled={simBusy || !simStatus?.autoRunning}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/40 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-200 hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Stop Auto
+                </button>
+                <button
+                  onClick={triggerOneTick}
+                  disabled={simBusy}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-bold text-cyan-200 hover:bg-cyan-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  One Tick
+                </button>
+                <span className="text-[11px] text-muted-foreground">
+                  {simStatus
+                    ? `Interval ${Math.round(simStatus.intervalMs / 1000)}s · ${simStatus.totalTicks} ticks`
+                    : "Backend offline"}
+                </span>
+              </div>
+            </div>
+            <p className="mt-3 flex items-center gap-2 text-[11px] text-muted-foreground">
+              <Zap className="h-3 w-3" />
+              Toggles a random simulator-source device (Drawing Room or Work Room 2).
+              Manual device control always works — this only drives random auto-ticking.
+            </p>
           </Panel>
 
           {/* Device Matrix */}
@@ -170,7 +299,13 @@ function SimulationPage() {
               />
               <div className="flex items-center justify-between rounded-lg border border-border/40 bg-background/40 px-3 py-2 text-sm">
                 <span className="text-muted-foreground">Simulator Mode</span>
-                <span className="font-mono text-accent">Simulated telemetry</span>
+                <span
+                  className={`font-mono ${
+                    backendConnected ? "text-emerald-300" : "text-muted-foreground"
+                  }`}
+                >
+                  {backendConnected ? "Live (backend)" : "Offline (local mock)"}
+                </span>
               </div>
               <div className="flex items-center justify-between rounded-lg border border-border/40 bg-background/40 px-3 py-2 text-sm">
                 <span className="text-muted-foreground">Wokwi Connection</span>
@@ -225,9 +360,8 @@ function SimulationPage() {
                   Telemetry Stream Active
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Scenario control logic interpreting device state changes in real time. Backend
-                  APIs and Socket.IO will stream live telemetry once the hardware pipeline is
-                  connected.
+                  Operator controls are connected to the OfficePulse backend. Simulator controls
+                  validate device states, alerts, and telemetry behavior.
                 </p>
                 <div className="mt-4 grid grid-cols-3 gap-2 w-full">
                   {Object.entries(ROOM_META).map(([id, m]) => (

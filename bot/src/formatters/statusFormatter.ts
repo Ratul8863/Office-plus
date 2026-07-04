@@ -1,6 +1,6 @@
-import type { DeviceState, UsageResponse } from "../api/backendClient";
-import type { Alert } from "../api/backendClient";
-import { ROOM_ALIASES } from "../utils/roomName";
+import type { DeviceState, UsageResponse } from "../api/backendClient.js";
+import type { Alert } from "../api/backendClient.js";
+import { ROOM_ALIASES } from "../utils/roomName.js";
 
 /**
  * Format a Discord-friendly office snapshot.

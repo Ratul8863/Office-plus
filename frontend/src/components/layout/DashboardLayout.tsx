@@ -16,6 +16,7 @@ import { initSocket, disconnectSocket } from "@/services/socketClient";
 import { officeApi } from "@/services/officeApi";
 import { usageApi } from "@/services/usageApi";
 import { alertApi } from "@/services/alertApi";
+import { Toaster } from "@/components/ui/sonner";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
@@ -78,11 +79,33 @@ export function DashboardLayout() {
 
     fetchInitialData();
 
+    // Periodic /health probe — keeps the sidebar 'API Server' badge and any
+    // live-status labels in sync with the real backend, even if the very
+    // first fetch failed or the backend started after the page loaded.
+    const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+    const probeHealth = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/health`, {
+          headers: { Accept: "application/json" },
+        });
+        const body = await res.json().catch(() => null);
+        const ok =
+          res.ok && body && (body.success === undefined ? true : body.success);
+        useOfficeStore.getState().setBackendConnected(Boolean(ok));
+      } catch {
+        useOfficeStore.getState().setBackendConnected(false);
+      }
+    };
+    // Probe immediately, then every 3s
+    probeHealth();
+    const healthInterval = setInterval(probeHealth, 3000);
+
     // Establish WebSocket connection
     initSocket();
 
     return () => {
       console.log("[DashboardLayout] Cleaning up Socket.IO connection...");
+      clearInterval(healthInterval);
       disconnectSocket();
     };
   }, []);
@@ -224,6 +247,7 @@ export function DashboardLayout() {
           <Outlet />
         </main>
       </div>
+      <Toaster />
     </div>
   );
 }

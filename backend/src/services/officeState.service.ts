@@ -1,4 +1,5 @@
 import { INITIAL_DEVICES, DeviceConfig } from "../config/device.config";
+import { persistenceService } from "./persistence.service";
 
 export interface DeviceState extends DeviceConfig {
   status: "on" | "off";
@@ -29,6 +30,14 @@ class OfficeStateService {
     this.wokwiOnline = true;
   }
 
+  /**
+   * Replace the in-memory device list with the given array.
+   * Used during startup hydration from MongoDB.
+   */
+  public hydrate(devices: DeviceState[]): void {
+    this.devices = devices.map((d) => ({ ...d }));
+  }
+
   public getDevices(): DeviceState[] {
     return this.devices;
   }
@@ -52,19 +61,25 @@ class OfficeStateService {
   }
 
   /**
-   * Periodically called to check if Wokwi telemetry has timed out (60 seconds).
-   * Returns true if status changed.
+   * Periodically called to check if Wokwi telemetry has timed out.
+   * @param timeoutMs Time in milliseconds without telemetry before Wokwi is
+   *                  considered offline. Defaults to 60_000 (60 seconds).
+   * @returns true if the online status transitioned during this call.
    */
-  public checkWokwiTimeout(): boolean {
-    // If we've never received telemetry and the server has been running, check elapsed since startup
-    // We initialized lastWokwiTelemetry to null, but let's assume we treat it as starting at current time
+  public checkWokwiTimeout(timeoutMs: number = 60 * 1000): boolean {
+    // If we've never received telemetry, treat the server start time as the
+    // reference point so we don't immediately flag the link as offline.
     const referenceTime = this.lastWokwiTelemetry || new Date();
     const elapsed = Date.now() - referenceTime.getTime();
 
-    if (elapsed > 60 * 1000) {
+    if (elapsed > timeoutMs) {
       if (this.wokwiOnline) {
         this.wokwiOnline = false;
-        console.log("[OfficeStateService] Wokwi Gateway has timed out (60s without telemetry) -> OFFLINE");
+        console.log(
+          `[OfficeStateService] Wokwi Gateway has timed out (${Math.round(
+            timeoutMs / 1000
+          )}s without telemetry) -> OFFLINE`
+        );
         return true; // status changed to offline
       }
     }
@@ -82,6 +97,7 @@ class OfficeStateService {
   /**
    * Updates the state of a specific device.
    * Returns the updated device and a boolean indicating if status actually changed.
+   * On change, also writes a device_event document to MongoDB.
    */
   public updateDeviceState(
     deviceId: string,
@@ -97,6 +113,7 @@ class OfficeStateService {
     }
 
     const now = new Date().toISOString();
+    const previousStatus = device.status;
     device.status = status;
     device.currentWatt = status === "on" ? device.ratedWatt : 0;
     device.lastChanged = now;
@@ -104,6 +121,25 @@ class OfficeStateService {
       device.onSince = now;
     } else {
       device.onSince = null;
+    }
+
+    // Persist asynchronously — never block the live state mutation.
+    if (persistenceService.isStorageEnabled()) {
+      // Persist device state and the corresponding event.
+      void persistenceService.saveDeviceState(device);
+      void persistenceService.saveDeviceEvent({
+        deviceId: device.deviceId,
+        roomId: device.roomId,
+        roomName: device.roomName,
+        deviceName: device.name,
+        type: device.type,
+        previousStatus,
+        newStatus: device.status,
+        ratedWatt: device.ratedWatt,
+        currentWatt: device.currentWatt,
+        source: device.source,
+        timestamp: new Date(),
+      });
     }
 
     return { device, changed: true };

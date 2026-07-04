@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "author": "OfficePulse HQ",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-pushbutton", "id": "btn1", "top": -90,  "left": 160, "attrs": { "color": "blue" } },
+    { "type": "wokwi-pushbutton", "id": "btn2", "top": -60,  "left": 160, "attrs": { "color": "blue" } },
+    { "type": "wokwi-pushbutton", "id": "btn3", "top": -30,  "left": 160, "attrs": { "color": "blue" } },
+    { "type": "wokwi-pushbutton", "id": "btn4", "top":   0,  "left": 160, "attrs": { "color": "blue" } },
+    { "type": "wokwi-pushbutton", "id": "btn5", "top":  30,  "left": 160, "attrs": { "color": "blue" } },
+    { "type": "wokwi-led",        "id": "led1", "top": -110, "left": 220, "attrs": { "color": "red" } },
+    { "type": "wokwi-led",        "id": "led2", "top": -80,  "left": 220, "attrs": { "color": "red" } },
+    { "type": "wokwi-led",        "id": "led3", "top": -50,  "left": 220, "attrs": { "color": "red" } },
+    { "type": "wokwi-led",        "id": "led4", "top": -20,  "left": 220, "attrs": { "color": "red" } },
+    { "type": "wokwi-led",        "id": "led5", "top":  10,  "left": 220, "attrs": { "color": "red" } }
+  ],
+  "connections": [
+    ["btn1:1.l",     "esp:14.GPIO.32", "blue",  ["v:0"]],
+    ["btn1:2.l",     "esp:GND.1",      "blue",  ["v:0"]],
+    ["btn2:1.l",     "esp:14.GPIO.33", "blue",  ["v:0"]],
+    ["btn2:2.l",     "esp:GND.1",      "blue",  ["v:0"]],
+    ["btn3:1.l",     "esp:14.GPIO.34", "blue",  ["v:0"]],
+    ["btn3:2.l",     "esp:GND.1",      "blue",  ["v:0"]],
+    ["btn4:1.l",     "esp:14.GPIO.35", "blue",  ["v:0"]],
+    ["btn4:2.l",     "esp:GND.1",      "blue",  ["v:0"]],
+    ["btn5:1.l",     "esp:14.GPIO.25", "blue",  ["v:0"]],
+    ["btn5:2.l",     "esp:GND.1",      "blue",  ["v:0"]],
+
+    ["led1:A",       "esp:14.GPIO.26", "green", ["v:0"]],
+    ["led1:C",       "esp:GND.1",      "green", ["v:0"]],
+    ["led2:A",       "esp:14.GPIO.27", "green", ["v:0"]],
+    ["led2:C",       "esp:GND.1",      "green", ["v:0"]],
+    ["led3:A",       "esp:14.GPIO.14", "green", ["v:0"]],
+    ["led3:C",       "esp:GND.1",      "green", ["v:0"]],
+    ["led4:A",       "esp:14.GPIO.12", "green", ["v:0"]],
+    ["led4:C",       "esp:GND.1",      "green", ["v:0"]],
+    ["led5:A",       "esp:14.GPIO.13", "green", ["v:0"]],
+    ["led5:C",       "esp:GND.1",      "green", ["v:0"]]
+  ]
+}

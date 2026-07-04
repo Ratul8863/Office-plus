@@ -1,6 +1,6 @@
-import { getBackendClient } from "../api/backendClient";
-import { formatRoom } from "../formatters/roomFormatter";
-import { resolveRoomId } from "../utils/roomName";
+import { getBackendClient } from "../api/backendClient.js";
+import { formatRoom } from "../formatters/roomFormatter.js";
+import { resolveRoomId } from "../utils/roomName.js";
 
 export const roomCommand = {
   name: "room",

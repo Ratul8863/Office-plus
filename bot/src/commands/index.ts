@@ -1,8 +1,8 @@
-import { helpCommand } from "./help.command";
-import { statusCommand } from "./status.command";
-import { roomCommand } from "./room.command";
-import { usageCommand } from "./usage.command";
-import { alertsCommand } from "./alerts.command";
+import { helpCommand } from "./help.command.js";
+import { statusCommand } from "./status.command.js";
+import { roomCommand } from "./room.command.js";
+import { usageCommand } from "./usage.command.js";
+import { alertsCommand } from "./alerts.command.js";
 
 export interface Command {
   name: string;

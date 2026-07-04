@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from "axios";
-import { loadEnv } from "../config/env";
-import { logger } from "../utils/logger";
+import { loadEnv } from "../config/env.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * Typed shapes that mirror the backend responses.

@@ -1,0 +1,977 @@
+OfficePulse — Real-Time Office Energy Monitoring System
+Problem statement অনুযায়ী boss chay office-er lights/fans live dashboard-e monitor korte, power usage দেখতে, and Discord bot diye status/usage ask korte. Deliverables-er moddhe high-level diagram, Wokwi/Tinkercad hardware schematic, simulated device data, real-time web dashboard, Discord bot, public repo, README, and demo video ache.
+
+1. Main Goal
+Amader goal:
+Build a real-time office electricity monitoring system
+where simulated hardware/circuit data goes to one backend,
+and both web dashboard + Discord bot read the same live device state.
+Core principle:
+Single Backend = Single Source of Truth
+Dashboard direct Wokwi/MQTT/MongoDB read korbe na. Discord bot-o direct Wokwi/MQTT/MongoDB read korbe na. Duita interface-i backend theke data pabe.
+
+2. Problem
+Office-e people lights/fans off na kore chole jay. Electricity bill barche. Boss chay:
+1. Kon room-e kon device ON/OFF ache dekhte
+2. Total power usage dekhte
+3. Room-wise power usage dekhte
+4. Office hour sesh hole alert pete
+5. Discord theke quick status ask korte
+6. Same data dashboard and bot-e reflect korte
+Dashboard-er minimum features: live device status, live power consumption, room-wise breakdown, active alerts, and page refresh chara real-time update. Discord bot-er minimum commands: !status, !room <name>, and !usage; bot must use actual simulated data, hardcoded/random answer na.
+
+3. Best Solution
+Amra build korbo:
+Wokwi ESP32 Circuit
+   ↓ MQTT
+MQTT Broker
+   ↓
+Node.js Backend
+   ↓
+MongoDB + In-memory State
+   ↓
+Socket.IO + REST API
+   ↓                    ↓
+React Dashboard      Discord Bot
+Final system idea
+1. Wokwi ESP32 circuit room-er device switch read korbe
+2. ESP32 MQTT broker-e telemetry pathabe
+3. Backend MQTT message receive korbe
+4. Backend device state update korbe
+5. Backend MongoDB-te event/history save korbe
+6. Backend power usage and alerts calculate korbe
+7. Backend Socket.IO diye dashboard update korbe
+8. Discord bot backend API theke same live data niye answer dibe
+
+4. Final Stack
+Frontend
+React + Vite + TypeScript + Tailwind CSS
+Socket.IO Client
+TanStack Query
+Zustand
+Recharts
+Lucide React
+Backend
+Node.js + Express + TypeScript
+Socket.IO
+MQTT.js
+MongoDB Atlas + Mongoose
+Zod validation
+Winston/Pino logger
+node-cron
+Discord Bot
+discord.js
+TypeScript
+Axios
+Hardware Simulation
+Wokwi
+ESP32
+Arduino C++ firmware
+MQTT PubSubClient
+Database
+MongoDB Atlas
+Deployment
+Frontend: Vercel / Netlify
+Backend + Bot: Render / Railway / Fly.io
+MQTT Broker: EMQX Cloud / HiveMQ Cloud free tier
+MongoDB: MongoDB Atlas free tier
+
+
+
+5. Why this stack is best
+Need
+Stack
+Reason
+Real-time dashboard
+Socket.IO
+Refresh chara instant update
+IoT/circuit connection
+MQTT
+ESP32 → backend communication-er jonno best
+Backend
+Node.js + TypeScript
+Express, Socket.IO, MQTT, Discord same ecosystem
+Database
+MongoDB
+Device state/events/alerts JSON-like data naturally fit kore
+Bot
+discord.js
+Discord bot build korar standard library
+Frontend
+React + Vite
+Fast, clean dashboard build
+Hardware
+Wokwi ESP32
+IoT-style simulation, WiFi/MQTT support
+
+
+6. Important Device Count Decision
+Problem statement-e ekta inconsistency ache:
+2 fans + 3 lights per room = 5 devices per room
+3 rooms × 5 = 15 devices
+But statement-e “18 devices total” bola hoyeche. Page-er office layout-o 2 fans + 3 lights per room show kore.
+Best engineering solution:
+Backend device config flexible rakhbo.
+Default layout: 15 visible devices based on office diagram.
+Compatibility mode: 18 devices support kora possible through config.
+README-te clearly mention korbo this mismatch.
+Code-e device.config.ts thakbe. Future-e judge jodi strictly 18 bole, just config update kore extra device add kora jabe.
+
+7. Final Monorepo Architecture
+Repo structure hobe:
+officepulse/
+├── apps/
+│   ├── backend/
+│   ├── frontend/
+│   └── bot/
+│
+├── hardware/
+│   └── wokwi/
+│
+├── packages/
+│   └── shared/
+│
+├── docs/
+│   ├── diagrams/
+│   ├── hardware/
+│   ├── api/
+│   └── demo/
+│
+├── scripts/
+├── .github/
+├── .env.example
+├── package.json
+├── pnpm-workspace.yaml
+├── README.md
+└── LICENSE
+Amra pnpm workspace use korbo. Karon frontend, backend, bot, shared types ek repo-te clean thakbe.
+
+8. Backend Folder/File Architecture
+Backend hobe main brain.
+apps/backend/
+├── src/
+│   ├── index.ts
+│   ├── app.ts
+│   ├── server.ts
+│   │
+│   ├── config/
+│   │   ├── env.ts
+│   │   ├── constants.ts
+│   │   ├── device.config.ts
+│   │   └── office-hours.config.ts
+│   │
+│   ├── db/
+│   │   ├── connectMongo.ts
+│   │   └── seedDevices.ts
+│   │
+│   ├── mqtt/
+│   │   ├── mqttClient.ts
+│   │   ├── mqttTopics.ts
+│   │   └── telemetrySubscriber.ts
+│   │
+│   ├── socket/
+│   │   ├── socketServer.ts
+│   │   ├── socketEvents.ts
+│   │   └── emitOfficeState.ts
+│   │
+│   ├── modules/
+│   │   ├── devices/
+│   │   │   ├── device.model.ts
+│   │   │   ├── device.types.ts
+│   │   │   ├── device.routes.ts
+│   │   │   ├── device.controller.ts
+│   │   │   ├── device.service.ts
+│   │   │   ├── device.store.ts
+│   │   │   └── device.validation.ts
+│   │   │
+│   │   ├── rooms/
+│   │   │   ├── room.types.ts
+│   │   │   ├── room.routes.ts
+│   │   │   ├── room.controller.ts
+│   │   │   └── room.service.ts
+│   │   │
+│   │   ├── telemetry/
+│   │   │   ├── telemetry.routes.ts
+│   │   │   ├── telemetry.controller.ts
+│   │   │   ├── telemetry.service.ts
+│   │   │   └── telemetry.validation.ts
+│   │   │
+│   │   ├── usage/
+│   │   │   ├── usage.model.ts
+│   │   │   ├── usage.routes.ts
+│   │   │   ├── usage.controller.ts
+│   │   │   └── usage.service.ts
+│   │   │
+│   │   ├── alerts/
+│   │   │   ├── alert.model.ts
+│   │   │   ├── alert.routes.ts
+│   │   │   ├── alert.controller.ts
+│   │   │   ├── alert.service.ts
+│   │   │   └── alert.rules.ts
+│   │   │
+│   │   └── health/
+│   │       ├── health.routes.ts
+│   │       └── health.controller.ts
+│   │
+│   ├── simulator/
+│   │   ├── virtualRoomSimulator.ts
+│   │   ├── randomToggleEngine.ts
+│   │   └── simulator.scheduler.ts
+│   │
+│   ├── services/
+│   │   ├── powerCalculator.service.ts
+│   │   ├── kwhEstimator.service.ts
+│   │   ├── officeState.service.ts
+│   │   └── notification.service.ts
+│   │
+│   ├── jobs/
+│   │   ├── usageSnapshot.job.ts
+│   │   └── alertChecker.job.ts
+│   │
+│   ├── middleware/
+│   │   ├── errorHandler.ts
+│   │   ├── notFound.ts
+│   │   ├── requestLogger.ts
+│   │   └── validateRequest.ts
+│   │
+│   ├── utils/
+│   │   ├── logger.ts
+│   │   ├── time.ts
+│   │   ├── power.ts
+│   │   └── response.ts
+│   │
+│   └── types/
+│       ├── express.d.ts
+│       └── global.ts
+│
+├── tests/
+│   ├── device.service.test.ts
+│   ├── powerCalculator.test.ts
+│   └── alert.rules.test.ts
+│
+├── .env.example
+├── package.json
+├── tsconfig.json
+└── README.md
+
+9. Backend Responsibilities
+device.store.ts
+Current live device state memory-te rakhbe.
+In-memory state = fastest live state
+MongoDB = persistent history/current backup
+telemetrySubscriber.ts
+MQTT broker theke Wokwi ESP32 telemetry receive korbe.
+telemetry.service.ts
+Incoming data validate kore device state update korbe.
+powerCalculator.service.ts
+Total watt, room watt, active devices calculate korbe.
+alert.rules.ts
+Alert condition check korbe:
+1. Device ON after office hours
+2. All devices in a room ON for more than 2 hours
+3. High power usage
+4. MQTT device offline
+socketServer.ts
+Frontend-e live data broadcast korbe.
+usageSnapshot.job.ts
+Every 1 minute usage snapshot MongoDB-te save korbe.
+
+10. Frontend Folder/File Architecture
+Dashboard hobe clean, visual, real-time.
+apps/frontend/
+├── src/
+│   ├── main.tsx
+│   ├── App.tsx
+│   ├── router.tsx
+│   ├── index.css
+│   │
+│   ├── config/
+│   │   ├── env.ts
+│   │   └── routes.ts
+│   │
+│   ├── pages/
+│   │   ├── DashboardPage.tsx
+│   │   ├── RoomDetailPage.tsx
+│   │   └── NotFoundPage.tsx
+│   │
+│   ├── layouts/
+│   │   └── DashboardLayout.tsx
+│   │
+│   ├── components/
+│   │   ├── common/
+│   │   │   ├── Badge.tsx
+│   │   │   ├── Card.tsx
+│   │   │   ├── LoadingState.tsx
+│   │   │   ├── EmptyState.tsx
+│   │   │   └── ErrorState.tsx
+│   │   │
+│   │   ├── dashboard/
+│   │   │   ├── Header.tsx
+│   │   │   ├── ConnectionStatus.tsx
+│   │   │   ├── SummaryCards.tsx
+│   │   │   ├── TotalPowerCard.tsx
+│   │   │   ├── ActiveDevicesCard.tsx
+│   │   │   ├── TodayUsageCard.tsx
+│   │   │   └── LastUpdatedCard.tsx
+│   │   │
+│   │   ├── office-map/
+│   │   │   ├── OfficeMap.tsx
+│   │   │   ├── RoomZone.tsx
+│   │   │   ├── Door.tsx
+│   │   │   ├── Window.tsx
+│   │   │   ├── FanIcon.tsx
+│   │   │   ├── LightIcon.tsx
+│   │   │   ├── DeskIcon.tsx
+│   │   │   └── SofaIcon.tsx
+│   │   │
+│   │   ├── devices/
+│   │   │   ├── DeviceStatusPanel.tsx
+│   │   │   ├── DeviceCard.tsx
+│   │   │   ├── DeviceStatusDot.tsx
+│   │   │   ├── DeviceTypeIcon.tsx
+│   │   │   └── DeviceGrid.tsx
+│   │   │
+│   │   ├── rooms/
+│   │   │   ├── RoomPowerBreakdown.tsx
+│   │   │   ├── RoomCard.tsx
+│   │   │   └── RoomStatusSummary.tsx
+│   │   │
+│   │   ├── alerts/
+│   │   │   ├── AlertsPanel.tsx
+│   │   │   ├── AlertCard.tsx
+│   │   │   └── AlertSeverityBadge.tsx
+│   │   │
+│   │   └── charts/
+│   │       ├── PowerUsageChart.tsx
+│   │       ├── RoomUsageBarChart.tsx
+│   │       └── UsageTimeline.tsx
+│   │
+│   ├── hooks/
+│   │   ├── useSocket.ts
+│   │   ├── useOfficeState.ts
+│   │   ├── useRooms.ts
+│   │   ├── useAlerts.ts
+│   │   └── useUsage.ts
+│   │
+│   ├── services/
+│   │   ├── apiClient.ts
+│   │   ├── socketClient.ts
+│   │   ├── officeApi.ts
+│   │   ├── roomApi.ts
+│   │   ├── alertApi.ts
+│   │   └── usageApi.ts
+│   │
+│   ├── store/
+│   │   └── officeStore.ts
+│   │
+│   ├── types/
+│   │   ├── device.types.ts
+│   │   ├── room.types.ts
+│   │   ├── alert.types.ts
+│   │   ├── usage.types.ts
+│   │   └── socket.types.ts
+│   │
+│   ├── utils/
+│   │   ├── formatPower.ts
+│   │   ├── formatTime.ts
+│   │   ├── deviceHelpers.ts
+│   │   └── alertHelpers.ts
+│   │
+│   └── assets/
+│       └── logo.svg
+│
+├── public/
+├── .env.example
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+├── tailwind.config.ts
+└── README.md
+
+11. Frontend UI Layout
+Dashboard page structure:
+┌────────────────────────────────────────────────────────────┐
+│ OfficePulse | Live Connected | Current Time                │
+├────────────────────────────────────────────────────────────┤
+│ Total Power | Today's kWh | Active Devices | Alerts        │
+├──────────────────────────────────────┬─────────────────────┤
+│                                      │ Room Breakdown      │
+│        Top-view Office Map           │ Drawing: 75W        │
+│        Lights glow when ON           │ Work 1: 120W        │
+│        Fans spin when ON             │ Work 2: 45W         │
+│                                      │                     │
+├──────────────────────────────────────┴─────────────────────┤
+│ Device Status Panel by Room                                │
+├────────────────────────────────────────────────────────────┤
+│ Active Alerts Panel                                        │
+└────────────────────────────────────────────────────────────┘
+Bonus visual:
+Light ON  = glow effect
+Fan ON    = CSS rotation animation
+OFF       = grey/disabled icon
+Alert     = red/orange pulse
+
+12. Discord Bot Folder/File Architecture
+Bot separate app hobe, but backend API use korbe.
+apps/bot/
+├── src/
+│   ├── index.ts
+│   ├── bot.ts
+│   │
+│   ├── config/
+│   │   └── env.ts
+│   │
+│   ├── commands/
+│   │   ├── status.command.ts
+│   │   ├── room.command.ts
+│   │   ├── usage.command.ts
+│   │   └── help.command.ts
+│   │
+│   ├── events/
+│   │   ├── ready.event.ts
+│   │   ├── messageCreate.event.ts
+│   │   └── alertForwarder.event.ts
+│   │
+│   ├── api/
+│   │   └── backendClient.ts
+│   │
+│   ├── formatters/
+│   │   ├── statusFormatter.ts
+│   │   ├── roomFormatter.ts
+│   │   ├── usageFormatter.ts
+│   │   └── alertFormatter.ts
+│   │
+│   ├── services/
+│   │   ├── commandRouter.service.ts
+│   │   └── proactiveAlert.service.ts
+│   │
+│   └── utils/
+│       └── logger.ts
+│
+├── .env.example
+├── package.json
+└── tsconfig.json
+Bot Commands
+!status
+!room drawing
+!room work1
+!room work2
+!usage
+!alerts
+!help
+Required commands are !status, !room <name>, and !usage; proactive alert message is bonus.
+
+13. Shared Package Architecture
+Common types and helpers ekhane thakbe.
+packages/shared/
+├── src/
+│   ├── types/
+│   │   ├── device.ts
+│   │   ├── room.ts
+│   │   ├── alert.ts
+│   │   ├── usage.ts
+│   │   └── telemetry.ts
+│   │
+│   ├── constants/
+│   │   ├── rooms.ts
+│   │   ├── devices.ts
+│   │   └── socketEvents.ts
+│   │
+│   ├── utils/
+│   │   ├── power.ts
+│   │   ├── time.ts
+│   │   └── formatters.ts
+│   │
+│   └── index.ts
+│
+├── package.json
+└── tsconfig.json
+Why shared package?
+Frontend, backend, bot same Device/Room/Alert type use korbe.
+Type mismatch kombe.
+
+14. Hardware/Wokwi Folder Architecture
+Complete Wokwi project file generate korbo na, but schematic docs and firmware code rakhbo.
+hardware/
+└── wokwi/
+   ├── README.md
+   ├── firmware/
+   │   └── esp32-office-room.ino
+   ├── docs/
+   │   ├── pin-mapping.md
+   │   ├── connection-list.md
+   │   ├── electrical-reasoning.md
+   │   └── mqtt-payload-format.md
+   └── screenshots/
+       ├── wokwi-circuit.png
+       └── wokwi-running-demo.png
+Wokwi circuit
+One representative room:
+ESP32
+├── 3 light switches
+├── 2 fan switches
+├── 5 status LEDs / relay indicators
+└── optional current sensor
+Pin mapping:
+Device
+Switch Pin
+Indicator Pin
+Watt
+Light 1
+GPIO 13
+GPIO 25
+15W
+Light 2
+GPIO 12
+GPIO 26
+15W
+Light 3
+GPIO 14
+GPIO 27
+15W
+Fan 1
+GPIO 32
+GPIO 18
+60W
+Fan 2
+GPIO 33
+GPIO 19
+60W
+
+
+15. Docs Folder Architecture
+docs/
+├── diagrams/
+│   ├── system-architecture.png
+│   ├── data-flow.png
+│   ├── backend-flow.png
+│   └── deployment-diagram.png
+│
+├── hardware/
+│   ├── hardware-schematic.png
+│   ├── pin-mapping.md
+│   └── circuit-explanation.md
+│
+├── api/
+│   ├── rest-api.md
+│   ├── socket-events.md
+│   └── mqtt-topics.md
+│
+├── demo/
+│   ├── demo-script.md
+│   ├── video-checklist.md
+│   └── screenshots/
+│
+└── decisions/
+   ├── adr-001-stack-choice.md
+   ├── adr-002-mqtt-vs-http.md
+   ├── adr-003-mongodb-choice.md
+   └── adr-004-device-count-mismatch.md
+ADR means Architecture Decision Record. Judges দেখলে বুঝবে amra engineering process follow করছি.
+
+16. MongoDB Collections
+devices
+Current device state.
+{
+ deviceId: string;
+ name: string;
+ type: "fan" | "light";
+ roomId: "drawing" | "work1" | "work2";
+ roomName: string;
+ status: "on" | "off";
+ ratedWatt: number;
+ currentWatt: number;
+ source: "wokwi" | "simulator";
+ lastChanged: Date;
+ onSince?: Date;
+ updatedAt: Date;
+}
+device_events
+ON/OFF history.
+{
+ deviceId: string;
+ roomId: string;
+ previousStatus: "on" | "off";
+ newStatus: "on" | "off";
+ watt: number;
+ source: "wokwi" | "simulator";
+ timestamp: Date;
+}
+alerts
+Active and historical alerts.
+{
+ alertId: string;
+ type: "AFTER_HOURS_ON" | "ROOM_FULLY_ON_TOO_LONG" | "HIGH_USAGE" | "DEVICE_OFFLINE";
+ severity: "info" | "warning" | "critical";
+ roomId?: string;
+ deviceId?: string;
+ message: string;
+ active: boolean;
+ createdAt: Date;
+ resolvedAt?: Date;
+}
+usage_snapshots
+Usage analytics.
+{
+ totalWatt: number;
+ roomWatts: {
+   drawing: number;
+   work1: number;
+   work2: number;
+ };
+ activeDeviceCount: number;
+ estimatedKwhToday: number;
+ timestamp: Date;
+}
+
+17. API Endpoints
+Health
+GET /health
+Office state
+GET /api/state
+Response:
+{
+ "success": true,
+ "data": {
+   "devices": [],
+   "rooms": [],
+   "usage": {
+     "totalWatt": 285,
+     "estimatedKwhToday": 4.2
+   },
+   "alerts": [],
+   "lastUpdated": "2026-07-03T12:00:00.000Z"
+ }
+}
+Rooms
+GET /api/rooms
+GET /api/rooms/:roomId
+Usage
+GET /api/usage
+GET /api/usage/today
+GET /api/usage/history
+Alerts
+GET /api/alerts
+GET /api/alerts/active
+POST /api/alerts/:alertId/resolve
+Telemetry
+POST /api/telemetry
+HTTP fallback for Wokwi.
+Device control for demo
+POST /api/devices/:deviceId/toggle
+This is useful for demo, but README-te mention korbo:
+This endpoint is for simulation/demo only.
+
+18. MQTT Topics
+office/wokwi/work1/telemetry
+office/wokwi/work1/status
+office/backend/alerts
+Telemetry payload
+{
+ "source": "wokwi-esp32-room1",
+ "roomId": "work1",
+ "devices": [
+   {
+     "deviceId": "work1-light-1",
+     "status": "on",
+     "watt": 15
+   },
+   {
+     "deviceId": "work1-fan-1",
+     "status": "off",
+     "watt": 0
+   }
+ ],
+ "timestamp": "2026-07-03T12:00:00.000Z"
+}
+
+19. Socket.IO Events
+Frontend listen korbe:
+office:state
+device:changed
+usage:updated
+alert:new
+alert:resolved
+connection:status
+Backend emit korbe:
+io.emit("office:state", officeState);
+io.emit("device:changed", changedDevice);
+io.emit("usage:updated", usage);
+io.emit("alert:new", alert);
+
+20. Data Flow
+Wokwi → Backend
+Switch ON/OFF
+   ↓
+ESP32 reads GPIO
+   ↓
+ESP32 creates JSON telemetry
+   ↓
+Publishes to MQTT broker
+   ↓
+Backend receives via MQTT.js
+   ↓
+Backend validates payload
+   ↓
+Backend updates device store
+   ↓
+Backend writes event to MongoDB
+Backend → Dashboard
+Device state changed
+   ↓
+Power recalculated
+   ↓
+Alerts recalculated
+   ↓
+Socket.IO emits office:state
+   ↓
+React dashboard updates instantly
+Discord Bot
+User sends !status
+   ↓
+Bot calls GET /api/state
+   ↓
+Backend returns current source-of-truth state
+   ↓
+Bot formats friendly response
+   ↓
+Discord message sent
+
+21. Backend Core Logic
+Power calculation
+If device is ON:
+   currentWatt = ratedWatt
+Else:
+   currentWatt = 0
+Total power:
+totalWatt = sum(all device currentWatt)
+Room power:
+roomWatt = sum(room devices currentWatt)
+Estimated kWh:
+kWh = wattHours / 1000
+For MVP:
+usage_snapshots every 1 minute
+estimatedKwhToday = sum(snapshotWatt × intervalHours) / 1000
+
+22. Alert Rules
+Rule 1 — After office hours
+If current time is after 5 PM or before 9 AM
+and any device is ON
+→ create alert
+Rule 2 — Room fully ON too long
+If all devices in a room are ON
+and all have been ON for more than 2 hours
+→ create alert
+Rule 3 — High usage
+If total watt > threshold
+→ warning alert
+Example threshold:
+300W for demo
+Rule 4 — Wokwi offline
+If no MQTT telemetry from Wokwi for 60 seconds
+→ device source offline alert
+
+23. Simulator Strategy
+Wokwi will represent one room. Other rooms can be simulated by backend.
+Work Room 1 = Wokwi ESP32 telemetry
+Drawing Room = backend simulator
+Work Room 2 = backend simulator
+This is best because:
+1. Circuit connection demo hoy
+2. Full office dashboard complete thake
+3. Wokwi schematic simple thake
+4. Backend still supports all rooms
+Simulator logic:
+Every 8 seconds:
+   randomly choose Drawing Room or Work Room 2
+   randomly toggle one device
+   update lastChanged
+   recalculate usage
+   emit live update
+
+24. Environment Variables
+Root .env.example:
+# Backend
+PORT=5000
+NODE_ENV=development
+CLIENT_URL=http://localhost:5173
+MONGODB_URI=mongodb+srv://...
+ENABLE_SIMULATOR=true
+DEVICE_COUNT_MODE=layout15
+
+# MQTT
+MQTT_BROKER_URL=mqtts://xxxx.emqxsl.com:8883
+MQTT_USERNAME=your_username
+MQTT_PASSWORD=your_password
+MQTT_CLIENT_ID=officepulse-backend
+
+# Discord
+DISCORD_TOKEN=your_discord_bot_token
+DISCORD_CHANNEL_ID=your_alert_channel_id
+BACKEND_API_URL=http://localhost:5000
+
+# Optional LLM
+LLM_ENABLED=false
+OPENAI_API_KEY=
+GROQ_API_KEY=
+
+25. Package Scripts
+Root package.json:
+{
+ "scripts": {
+   "dev": "pnpm --parallel dev",
+   "dev:backend": "pnpm --filter backend dev",
+   "dev:frontend": "pnpm --filter frontend dev",
+   "dev:bot": "pnpm --filter bot dev",
+   "build": "pnpm -r build",
+   "lint": "pnpm -r lint",
+   "test": "pnpm -r test"
+ }
+}
+
+26. Implementation Plan
+Phase 1 — Repo setup
+- Monorepo setup
+- TypeScript setup
+- Shared package setup
+- ESLint/Prettier
+- README skeleton
+Phase 2 — Backend foundation
+- Express server
+- MongoDB connection
+- Health API
+- Error handler
+- Device config
+- Seed devices
+Phase 3 — Device state engine
+- In-memory device store
+- Device update service
+- Power calculation service
+- Room summary service
+Phase 4 — MQTT integration
+- MQTT client connect
+- Subscribe to Wokwi topic
+- Validate telemetry
+- Update backend state from MQTT
+Phase 5 — Simulator
+- Virtual simulator for non-Wokwi rooms
+- Random toggle engine
+- Config enable/disable
+Phase 6 — Real-time Socket.IO
+- Socket server
+- office:state emit
+- device:changed emit
+- alert:new emit
+Phase 7 — REST APIs
+- /api/state
+- /api/rooms
+- /api/usage
+- /api/alerts
+- /api/telemetry
+Phase 8 — Frontend dashboard
+- Dashboard layout
+- Socket connection
+- Summary cards
+- Office map
+- Device status panel
+- Alerts panel
+- Power chart
+Phase 9 — Discord bot
+- Bot login
+- Command router
+- !status
+- !room
+- !usage
+- proactive alert posting
+Phase 10 — Wokwi circuit
+- ESP32
+- switches
+- LEDs/relay indicators
+- MQTT firmware
+- screenshots
+- pin mapping docs
+Phase 11 — Documentation
+- System diagram
+- Hardware schematic
+- API docs
+- Socket docs
+- MQTT docs
+- Setup guide
+- Demo script
+Phase 12 — Final demo polish
+- Live dashboard
+- Wokwi switch change
+- Discord command
+- Alert trigger
+- README cleanup
+- Commit history cleanup
+
+27. Validation Plan
+Feature
+How we test
+Wokwi telemetry
+Toggle switch, check backend logs
+Backend state
+GET /api/state returns updated device
+MongoDB event log
+Check device_events collection
+Dashboard real-time
+Toggle Wokwi switch, UI updates without refresh
+Discord status
+!status returns same state as dashboard
+Usage calculation
+Compare expected watt total manually
+Alerts
+Simulate after-hours and check alert panel
+Bot proactive alert
+Trigger alert and check Discord channel
+README setup
+Fresh clone test
+
+
+28. Trade-offs
+MQTT vs HTTP
+MQTT better for IoT-style live telemetry.
+HTTP simpler but less impressive for real IoT architecture.
+Decision:
+Use MQTT as primary.
+Keep HTTP telemetry endpoint as fallback.
+In-memory state vs MongoDB-only
+MongoDB-only can be slower for real-time.
+In-memory only loses history after restart.
+Decision:
+Use in-memory for live state.
+Use MongoDB for persistence/history.
+Wokwi all rooms vs one room
+All rooms in Wokwi = complex and time-consuming.
+One representative room = matches requirement and easier demo.
+Decision:
+Wokwi for Work Room 1.
+Backend simulator for other rooms.
+
+29. Final Product Summary
+Amader solution:
+OfficePulse is a real-time office energy monitoring system
+that connects an ESP32-based Wokwi circuit to a Node.js backend using MQTT.
+The backend maintains the single source of truth for device state,
+stores history in MongoDB, calculates live power usage and alerts,
+streams updates to a React dashboard through Socket.IO,
+and powers a Discord bot through REST APIs.
+This directly covers judging criteria:
+Working real-time dashboard
+Working Discord bot with same backend data
+Good dashboard UX
+Clear system diagram
+Sensible Wokwi circuit schematic
+Dynamic simulated data
+Documented modular codebase
+
+30. Final Architecture Line for README
+[Wokwi ESP32 Circuit + Backend Simulator]
+       ↓ MQTT / HTTP
+[Node.js Backend: Single Source of Truth]
+       ↓ MongoDB persistence
+       ↓ Socket.IO                    ↓ REST API
+[React Live Dashboard]            [Discord Bot]
+Next kaj: amra first backend skeleton + device data model + repo structure create korbo, because backend is the core. Backend thik hole dashboard, bot, Wokwi sob easily connect hobe.
+

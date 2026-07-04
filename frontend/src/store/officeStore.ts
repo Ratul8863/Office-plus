@@ -149,46 +149,31 @@ export const useOfficeStore = create<State>((set, get) => ({
     const d = state.devices.find((x) => x.deviceId === id);
     if (!d) return;
 
-    if (state.backendConnected) {
-      if (d.source === "wokwi" || d.roomId === "work1") {
-        toast.error(`Device "${d.name}" in Work Room 1 is managed via Wokwi telemetry and cannot be controlled directly.`);
-        return;
-      }
+    // Wokwi reservation: Work Room 1 is driven by hardware telemetry and
+    // must never be toggled from the UI.
+    if (d.source === "wokwi" || d.roomId === "work1") {
+      console.log(`[Device Toggle] Blocked — ${id} is reserved for Wokwi telemetry`);
+      toast.error("Work Room 1 is controlled by Wokwi telemetry.");
+      return;
+    }
 
-      try {
-        console.log(`[Store] API toggling device: ${id}`);
-        const updatedDevice = await officeApi.toggleDevice(id);
-        get().updateSingleDevice(updatedDevice);
-      } catch (err: any) {
-        console.error("[Store] Failed to toggle device via backend API:", err.message);
-        toast.error(`Failed to control device: ${err.message}`);
+    console.log("[Device Toggle]", id);
+
+    try {
+      const updatedDevice = await officeApi.toggleDevice(id);
+      console.log("[Device Toggle Response]", updatedDevice);
+      get().updateSingleDevice(updatedDevice);
+      if (!state.backendConnected) {
+        // First successful call after a previously failed initial fetch —
+        // flip the flag so the rest of the UI reflects live mode.
+        set({ backendConnected: true });
       }
-    } else {
-      // Mock toggle fallback (demo mode)
-      set((s) => {
-        const devices: Device[] = s.devices.map((item) => {
-          if (item.deviceId !== id) return item;
-          const status: "on" | "off" = item.status === "on" ? "off" : "on";
-          return {
-            ...item,
-            status,
-            currentWatt: status === "on" ? item.ratedWatt : 0,
-            lastChanged: new Date().toISOString(),
-            onSince: status === "on" ? new Date().toISOString() : undefined,
-          };
-        });
-        const target = devices.find((x) => x.deviceId === id)!;
-        return {
-          devices,
-          lastUpdated: new Date().toISOString(),
-          activity: pushActivity(s, {
-            type: "DEVICE_CHANGED",
-            message: `${target.roomName} ${target.name} turned ${target.status.toUpperCase()} (Demo Mode)`,
-            roomId: target.roomId,
-            deviceId: id,
-          }),
-        };
-      });
+    } catch (err: any) {
+      console.error("[Device Toggle] Backend request failed:", err?.message ?? err);
+      if (state.backendConnected) {
+        set({ backendConnected: false });
+      }
+      toast.error("Backend is offline. Device control is unavailable.");
     }
   },
 

@@ -1,4 +1,4 @@
-import { acceptedRoomAliases } from "../utils/roomName";
+import { acceptedRoomAliases } from "../utils/roomName.js";
 
 export const helpCommand = {
   name: "help",

@@ -1,4 +1,4 @@
-import type { Alert } from "../api/backendClient";
+import type { Alert } from "../api/backendClient.js";
 
 const SEVERITY_EMOJI: Record<Alert["severity"], string> = {
   info: "ℹ️",

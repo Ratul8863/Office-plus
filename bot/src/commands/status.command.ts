@@ -1,5 +1,5 @@
-import { getBackendClient } from "../api/backendClient";
-import { formatStatus } from "../formatters/statusFormatter";
+import { getBackendClient } from "../api/backendClient.js";
+import { formatStatus } from "../formatters/statusFormatter.js";
 
 export const statusCommand = {
   name: "status",

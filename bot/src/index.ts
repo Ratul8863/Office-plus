@@ -1,7 +1,7 @@
 import { Client, GatewayIntentBits, Events } from "discord.js";
-import { hasDiscordToken, loadEnv } from "./config/env";
-import { logger } from "./utils/logger";
-import { handleMessage } from "./services/commandRouter.service";
+import { hasDiscordToken, loadEnv } from "./config/env.js";
+import { logger } from "./utils/logger.js";
+import { handleMessage } from "./services/commandRouter.service.js";
 
 async function main(): Promise<void> {
   if (!hasDiscordToken()) {
@@ -29,24 +29,24 @@ async function main(): Promise<void> {
 
   client.on(Events.MessageCreate, (message) => {
     // Don't await — let the router handle its own errors/sends in the background.
-    handleMessage(message, { channelId: env.DISCORD_CHANNEL_ID }).catch((err) =>
-      logger.error("handleMessage crashed", err)
+    handleMessage(message, { channelId: env.DISCORD_CHANNEL_ID }).catch(
+      (err: unknown) => logger.error("handleMessage crashed", err)
     );
   });
 
-  client.on(Events.Error, (err) => {
+  client.on(Events.Error, (err: unknown) => {
     logger.error("Discord client error", err);
   });
 
   try {
     await client.login(env.DISCORD_TOKEN);
-  } catch (err) {
+  } catch (err: unknown) {
     logger.error("Failed to log in to Discord. Is DISCORD_TOKEN valid?", err);
     process.exit(1);
   }
 }
 
-main().catch((err) => {
+main().catch((err: unknown) => {
   logger.error("Fatal startup error", err);
   process.exit(1);
 });

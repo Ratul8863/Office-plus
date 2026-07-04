@@ -2,6 +2,7 @@ import { officeStateService } from "./officeState.service";
 import { powerCalculatorService } from "./powerCalculator.service";
 import { env } from "../config/env";
 import { isAfterHours } from "../utils/time";
+import { persistenceService } from "./persistence.service";
 
 export interface Alert {
   id: string;
@@ -68,7 +69,12 @@ class AlertService {
 
     this.alerts.push(newAlert);
     console.log(`[AlertService] ALERT TRIGGERED: ${type} - ${message}`);
-    
+
+    // Persist (no-op if MongoDB not connected).
+    if (persistenceService.isStorageEnabled()) {
+      void persistenceService.saveAlert(newAlert);
+    }
+
     if (this.onAlertTriggered) {
       this.onAlertTriggered(newAlert);
     }
@@ -92,7 +98,14 @@ class AlertService {
       alert.status = "resolved";
       alert.resolvedAt = new Date().toISOString();
       console.log(`[AlertService] ALERT RESOLVED: ${type} (ID: ${alert.id})`);
-      
+
+      if (persistenceService.isStorageEnabled()) {
+        void persistenceService.updateAlertResolved(
+          alert.id,
+          new Date(alert.resolvedAt)
+        );
+      }
+
       if (this.onAlertResolved) {
         this.onAlertResolved(alert);
       }
@@ -166,15 +179,16 @@ class AlertService {
     });
 
     // 4. DEVICE_OFFLINE Alert
-    // Check if Wokwi connection timeout is met
-    // Note: checkWokwiTimeout returns true if there is a transition from online to offline
-    officeStateService.checkWokwiTimeout();
-    
+    // Check if Wokwi connection timeout is met using the configured threshold.
+    // Note: checkWokwiTimeout returns true if there is a transition from online to offline.
+    const offlineThresholdMs = env.WOKWI_OFFLINE_TIMEOUT_SECONDS * 1000;
+    officeStateService.checkWokwiTimeout(offlineThresholdMs);
+
     if (!officeStateService.isWokwiOnline()) {
       this.triggerAlert(
         "DEVICE_OFFLINE",
         "critical",
-        "Wokwi ESP32 gateway is offline. No telemetry received for 60 seconds.",
+        `Wokwi ESP32 gateway is offline. No telemetry received for ${env.WOKWI_OFFLINE_TIMEOUT_SECONDS} seconds.`,
         "work1"
       );
     } else {

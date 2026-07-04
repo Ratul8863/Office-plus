@@ -1,5 +1,5 @@
-import { getBackendClient } from "../api/backendClient";
-import { formatUsage } from "../formatters/usageFormatter";
+import { getBackendClient } from "../api/backendClient.js";
+import { formatUsage } from "../formatters/usageFormatter.js";
 
 export const usageCommand = {
   name: "usage",
