@@ -10,6 +10,7 @@ import { publishHardwareRoomCommand } from "../mqtt/mqttClient";
 const router = Router();
 const masterStatusSchema = z.object({
   status: z.enum(["on", "off"]),
+  type: z.enum(["fan", "light"]).optional(),
 });
 
 router.get("/", (_req, res) => {
@@ -91,10 +92,10 @@ router.post("/:roomId/master", async (req, res) => {
     return;
   }
 
-  const { status } = parsed.data;
+  const { status, type } = parsed.data;
 
   try {
-    if (roomId === HARDWARE_ROOM_ID) {
+    if (roomId === HARDWARE_ROOM_ID && !type) {
       const command = await publishHardwareRoomCommand(roomId, status);
       res.json({
         success: true,
@@ -102,6 +103,7 @@ router.post("/:roomId/master", async (req, res) => {
           mode: "hardware-queued",
           roomId,
           status,
+          type: type ?? "all",
           topic: command.topic,
           payload: command.payload,
         },
@@ -109,9 +111,13 @@ router.post("/:roomId/master", async (req, res) => {
       return;
     }
 
-    const roomDevices = officeStateService
+    let roomDevices = officeStateService
       .getDevices()
       .filter((device) => device.roomId === roomId);
+
+    if (type) {
+      roomDevices = roomDevices.filter((device) => device.type === type);
+    }
 
     roomDevices.forEach((device) => {
       if (device.status === status) return;
@@ -135,6 +141,7 @@ router.post("/:roomId/master", async (req, res) => {
         mode: "direct",
         roomId,
         status,
+        type: type ?? "all",
       },
     });
   } catch (error: any) {

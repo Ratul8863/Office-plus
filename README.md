@@ -1,5 +1,7 @@
 # OfficePulse
 
+**Live Demo:** [https://eco-electricity-zeta.vercel.app/](https://eco-electricity-zeta.vercel.app/)
+
 OfficePulse is a hybrid smart-office energy monitoring and control platform. It combines a real-time web dashboard, a Node.js backend, MQTT-connected hardware for the Drawing Room, simulator-backed digital twin rooms, optional MongoDB persistence, and Discord-based alert visibility.
 
 The current system topology is intentionally mixed:
@@ -246,6 +248,8 @@ Useful if you want the bot process separated from the backend.
 - The bot reads live office data from the backend API
 
 ## Hardware and MQTT
+
+![Smart Office Room Controller — Circuit Diagram](assets/circuit-diagram.jpg)
 
 The hardware-backed room is `drawing`.
 

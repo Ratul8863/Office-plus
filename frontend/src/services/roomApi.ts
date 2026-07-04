@@ -16,6 +16,7 @@ export interface RoomMasterResult {
   mode: "direct" | "hardware-queued";
   roomId: RoomId;
   status: "on" | "off";
+  type?: "fan" | "light" | "all";
   topic?: string;
   payload?: "ON" | "OFF";
 }
@@ -23,9 +24,9 @@ export interface RoomMasterResult {
 export const roomApi = {
   getRooms: () => apiRequest<RoomDetail[]>("/api/rooms"),
   getRoom: (roomId: string) => apiRequest<RoomDetail>(`/api/rooms/${roomId}`),
-  setMasterState: (roomId: RoomId, status: "on" | "off") =>
+  setMasterState: (roomId: RoomId, status: "on" | "off", type?: "fan" | "light") =>
     apiRequest<RoomMasterResult>(`/api/rooms/${roomId}/master`, {
       method: "POST",
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, ...(type && { type }) }),
     }),
 };

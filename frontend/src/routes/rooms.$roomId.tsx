@@ -37,7 +37,7 @@ function RoomDetailPage() {
   const alerts = useMemo(() => allAlerts.filter((a) => a.roomId === rid), [allAlerts, rid]);
   const fans = roomDevices.filter((d) => d.type === "fan");
   const lights = roomDevices.filter((d) => d.type === "light");
-  const [masterBusy, setMasterBusy] = useState<"on" | "off" | null>(null);
+  const [masterBusy, setMasterBusy] = useState<string | null>(null);
 
   const [trend, setTrend] = useState<{ t: string; w: number }[]>(() =>
     Array.from({ length: 14 }, (_, i) => ({
@@ -56,15 +56,17 @@ function RoomDetailPage() {
   const maxDeviceWatt = Math.max(...roomDevices.map((d) => d.ratedWatt), 1);
   const isHardwareRoom = rid === "drawing";
 
-  async function handleMasterControl(status: "on" | "off") {
+  async function handleMasterControl(status: "on" | "off", type?: "fan" | "light") {
     if (masterBusy) return;
-    setMasterBusy(status);
+    const busyKey = `${type ?? "all"}-${status}` as any;
+    setMasterBusy(busyKey);
     try {
-      const result = await roomApi.setMasterState(rid, status);
+      const result = await roomApi.setMasterState(rid, status, type);
+      const label = type === "light" ? "Lights" : type === "fan" ? "Fans" : "All devices";
       toast.success(
         result.mode === "hardware-queued"
-          ? `${meta.name} master command sent via MQTT (${status.toUpperCase()}).`
-          : `${meta.name} all devices set to ${status.toUpperCase()}.`
+          ? `${meta.name} ${label.toLowerCase()} command sent via MQTT (${status.toUpperCase()}).`
+          : `${meta.name} ${label.toLowerCase()} set to ${status.toUpperCase()}.`
       );
     } catch (error: any) {
       toast.error(error?.message ?? "Room command failed.");
@@ -243,21 +245,46 @@ function RoomDetailPage() {
                 {isHardwareRoom ? "MQTT · smartoffice/drawing" : "Simulator · Direct"}
               </div>
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <button
-                onClick={() => handleMasterControl("on")}
-                disabled={masterBusy !== null}
-                className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm font-bold text-emerald-200 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {masterBusy === "on" ? "Sending..." : "All Lights + Fans ON"}
-              </button>
-              <button
-                onClick={() => handleMasterControl("off")}
-                disabled={masterBusy !== null}
-                className="rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {masterBusy === "off" ? "Sending..." : "All Lights + Fans OFF"}
-              </button>
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                <Lightbulb className="h-3.5 w-3.5" /> Lights
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  onClick={() => handleMasterControl("on", "light")}
+                  disabled={masterBusy !== null}
+                  className="rounded-xl border border-amber-300/40 bg-amber-300/10 px-4 py-3 text-sm font-bold text-amber-200 transition-colors hover:bg-amber-300/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {masterBusy === "light-on" ? "Sending..." : "All Lights ON"}
+                </button>
+                <button
+                  onClick={() => handleMasterControl("off", "light")}
+                  disabled={masterBusy !== null}
+                  className="rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {masterBusy === "light-off" ? "Sending..." : "All Lights OFF"}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                <Fan className="h-3.5 w-3.5" /> Fans
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  onClick={() => handleMasterControl("on", "fan")}
+                  disabled={masterBusy !== null}
+                  className="rounded-xl border border-cyan-400/40 bg-cyan-400/10 px-4 py-3 text-sm font-bold text-cyan-200 transition-colors hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {masterBusy === "fan-on" ? "Sending..." : "All Fans ON"}
+                </button>
+                <button
+                  onClick={() => handleMasterControl("off", "fan")}
+                  disabled={masterBusy !== null}
+                  className="rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {masterBusy === "fan-off" ? "Sending..." : "All Fans OFF"}
+                </button>
+              </div>
             </div>
             {isHardwareRoom && (
               <div className="mt-4 grid gap-2 text-[11px] text-muted-foreground">
