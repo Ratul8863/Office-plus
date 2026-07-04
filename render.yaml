@@ -1,8 +1,8 @@
 services:
-  - type: worker
-    name: office-pulse-bot
+  - type: web
+    name: office-pulse-backend
     runtime: node
-    rootDir: bot
+    rootDir: backend
     plan: free
     buildCommand: npm ci && npm run build
     startCommand: npm start
@@ -10,15 +10,41 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20
-      - key: DISCORD_TOKEN
+      - key: CLIENT_URL
         sync: false
-      - key: BACKEND_API_URL
+      - key: ENABLE_SIMULATOR
+        value: "true"
+      - key: ENABLE_RANDOM_SIMULATOR
+        value: "false"
+      - key: SIMULATOR_INTERVAL_MS
+        value: "8000"
+      - key: HIGH_USAGE_THRESHOLD_WATT
+        value: "300"
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB_NAME
+        value: "officepulse"
+      - key: MQTT_BROKER_URL
+        sync: false
+      - key: MQTT_USERNAME
+        sync: false
+      - key: MQTT_PASSWORD
+        sync: false
+      - key: MQTT_CLIENT_ID
+        value: "officepulse-backend-render"
+      - key: MQTT_TOPIC
+        value: "office/wokwi/work1/telemetry"
+      - key: MQTT_HARDWARE_TOPIC_PREFIX
+        value: "smartoffice/drawing"
+      - key: WOKWI_OFFLINE_TIMEOUT_SECONDS
+        value: "60"
+      - key: DISCORD_TOKEN
         sync: false
       - key: DISCORD_CHANNEL_ID
         sync: false
-      - key: LLM_ENABLED
-        value: "false"
-      - key: GROQ_API_KEY
-        sync: false
-      - key: OPENAI_API_KEY
-        sync: false
+      - key: DISCORD_BOT_INVITE_URL
+        value: "https://discord.com/oauth2/authorize?client_id=1522604103245496400&permissions=115712&integration_type=0&scope=bot+applications.commands"
+      - key: DISCORD_COMMAND_PREFIX
+        value: "!"
+      - key: DISCORD_ALERT_NOTIFICATIONS_ENABLED
+        value: "true"

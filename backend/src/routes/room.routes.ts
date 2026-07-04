@@ -138,7 +138,7 @@ router.post("/:roomId/master", async (req, res) => {
       },
     });
   } catch (error: any) {
-    res.status(500).json({
+    res.status(error?.status ?? 500).json({
       success: false,
       message: error.message,
     });

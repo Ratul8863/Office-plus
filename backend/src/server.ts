@@ -9,6 +9,7 @@ import { alertService } from "./services/alert.service";
 import { powerCalculatorService } from "./services/powerCalculator.service";
 import { connectMongo, isMongoConnected } from "./db/connectMongo";
 import { persistenceService } from "./services/persistence.service";
+import { discordService } from "./discord/discord.service";
 
 const server = http.createServer(app);
 
@@ -68,13 +69,16 @@ async function bootstrap(): Promise<void> {
   //    early telemetry messages overwrite hydrated values consistently).
   initMqttClient();
 
-  // 5. Start simulator if enabled
+  // 5. Start embedded Discord bot if configured.
+  await discordService.start();
+
+  // 6. Start simulator if enabled
   startSimulator();
 
-  // 6. Initial alert evaluation
+  // 7. Initial alert evaluation
   alertService.evaluateAlerts();
 
-  // 7. Wokwi timeout monitor every 5 seconds
+  // 8. Wokwi timeout monitor every 5 seconds
   const wokwiTimeoutInterval = setInterval(() => {
     try {
       const statusChanged = officeStateService.checkWokwiTimeout(
@@ -100,7 +104,7 @@ async function bootstrap(): Promise<void> {
     }
   }, 5000);
 
-  // 8. Usage snapshot interval — every 1 minute (MongoDB only; no-op otherwise).
+  // 9. Usage snapshot interval — every 1 minute (MongoDB only; no-op otherwise).
   usageSnapshotInterval = setInterval(() => {
     if (!persistenceService.isStorageEnabled()) return;
     try {
@@ -137,7 +141,7 @@ async function bootstrap(): Promise<void> {
     }
   }
 
-  // 9. Listen on PORT
+  // 10. Listen on PORT
   const port = env.PORT;
   server.listen(port, () => {
     console.log(`[Server] OfficePulse Backend listening on http://localhost:${port}`);
@@ -152,6 +156,7 @@ async function bootstrap(): Promise<void> {
     if (usageSnapshotInterval) clearInterval(usageSnapshotInterval);
     stopSimulator();
     stopAutoSimulator();
+    void discordService.stop();
     void persistenceService.shutdown();
 
     server.close(() => {

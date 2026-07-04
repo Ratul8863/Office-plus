@@ -27,10 +27,22 @@ function readBool(key: string, defaultValue: boolean): boolean {
   return v.toLowerCase() === "true" || v === "1";
 }
 
+function readPositiveInt(key: string, defaultValue: number): number {
+  const v = process.env[key];
+  if (v === undefined || v === null || v === "") return defaultValue;
+  const parsed = Number(v);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`[env] ${key} must be a positive number`);
+  }
+  return Math.floor(parsed);
+}
+
 export interface BotEnv {
   DISCORD_TOKEN: string;
   BACKEND_API_URL: string;
   DISCORD_CHANNEL_ID?: string;
+  DISCORD_ALERT_NOTIFICATIONS_ENABLED: boolean;
+  ALERT_POLL_INTERVAL_MS: number;
   LLM_ENABLED: boolean;
   GROQ_API_KEY?: string;
   OPENAI_API_KEY?: string;
@@ -56,6 +68,11 @@ export function loadEnv(): BotEnv {
     DISCORD_TOKEN: token,
     BACKEND_API_URL: readString("BACKEND_API_URL", "http://localhost:5000"),
     DISCORD_CHANNEL_ID: readOptional("DISCORD_CHANNEL_ID"),
+    DISCORD_ALERT_NOTIFICATIONS_ENABLED: readBool(
+      "DISCORD_ALERT_NOTIFICATIONS_ENABLED",
+      true
+    ),
+    ALERT_POLL_INTERVAL_MS: readPositiveInt("ALERT_POLL_INTERVAL_MS", 10000),
     LLM_ENABLED: readBool("LLM_ENABLED", false),
     GROQ_API_KEY: readOptional("GROQ_API_KEY"),
     OPENAI_API_KEY: readOptional("OPENAI_API_KEY"),

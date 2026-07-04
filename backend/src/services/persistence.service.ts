@@ -11,6 +11,15 @@ import {
 } from "../db/connectMongo";
 import { seedDevicesIfEmpty } from "../db/seedDevices";
 
+export interface PersistedActivityEvent {
+  eventId: string;
+  type: "DEVICE_CHANGED" | "ALERT_CREATED" | "SYSTEM";
+  message: string;
+  roomId?: string;
+  deviceId?: string;
+  createdAt: string;
+}
+
 /**
  * Persistence facade. Every method returns immediately and silently when
  * MongoDB is not configured or not connected, so the rest of the code path is
@@ -271,6 +280,81 @@ class PersistenceService {
         `[Persistence] getRecentUsageSnapshots failed: ${err?.message ?? err}`
       );
       return null;
+    }
+  }
+
+  public async getRecentActivity(limit = 40): Promise<PersistedActivityEvent[]> {
+    if (!isMongoConnected()) return [];
+
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 40;
+    const perSourceLimit = Math.max(safeLimit, 20);
+
+    try {
+      const [deviceEvents, alerts] = await Promise.all([
+        DeviceEventModel.find({})
+          .sort({ timestamp: -1 })
+          .limit(perSourceLimit)
+          .lean(),
+        AlertModel.find({})
+          .sort({ updatedAt: -1, triggeredAt: -1 })
+          .limit(perSourceLimit)
+          .lean(),
+      ]);
+
+      const mappedDeviceEvents: PersistedActivityEvent[] = deviceEvents.map((event: any) => ({
+        eventId: `device-event:${String(event._id)}`,
+        type: "DEVICE_CHANGED",
+        message: `${event.roomName} ${event.deviceName} turned ${String(
+          event.newStatus
+        ).toUpperCase()}`,
+        roomId: event.roomId,
+        deviceId: event.deviceId,
+        createdAt:
+          event.timestamp instanceof Date
+            ? event.timestamp.toISOString()
+            : new Date(event.timestamp).toISOString(),
+      }));
+
+      const mappedAlertEvents: PersistedActivityEvent[] = alerts.flatMap((alert: any) => {
+        const activity: PersistedActivityEvent[] = [
+          {
+            eventId: `alert-created:${alert.alertId}`,
+            type: "ALERT_CREATED",
+            message: alert.message,
+            roomId: alert.roomId,
+            deviceId: alert.deviceId,
+            createdAt:
+              alert.triggeredAt instanceof Date
+                ? alert.triggeredAt.toISOString()
+                : new Date(alert.triggeredAt).toISOString(),
+          },
+        ];
+
+        if (alert.resolvedAt) {
+          activity.push({
+            eventId: `alert-resolved:${alert.alertId}`,
+            type: "SYSTEM",
+            message: `Alert resolved: ${alert.message}`,
+            roomId: alert.roomId,
+            deviceId: alert.deviceId,
+            createdAt:
+              alert.resolvedAt instanceof Date
+                ? alert.resolvedAt.toISOString()
+                : new Date(alert.resolvedAt).toISOString(),
+          });
+        }
+
+        return activity;
+      });
+
+      return [...mappedDeviceEvents, ...mappedAlertEvents]
+        .sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+        .slice(0, safeLimit);
+    } catch (err: any) {
+      console.error(`[Persistence] getRecentActivity failed: ${err?.message ?? err}`);
+      return [];
     }
   }
 

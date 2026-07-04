@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Alert, ActivityEvent, Device, RoomId, Usage } from "@/types";
+import type { Alert, ActivityEvent, Device, RoomId, Usage, UsageHistoryPoint } from "@/types";
 import { initialActivity, initialAlerts, initialDevices } from "@/data/mockOfficeState";
 import { FAN_WATT, LIGHT_WATT, ROOM_META } from "@/utils/office";
 import { officeApi } from "@/services/officeApi";
@@ -16,13 +16,16 @@ interface State {
   backendConnected: boolean;
   socketConnected: boolean;
   usage: Usage | null;
+  usageHistory: UsageHistoryPoint[];
 
   // Setters to ingest API and Socket data
   setDevices: (devices: Device[]) => void;
   updateSingleDevice: (device: Device) => void;
   setAlerts: (alerts: Alert[]) => void;
+  setActivity: (activity: ActivityEvent[]) => void;
   addAlert: (alert: Alert) => void;
   setUsage: (usage: any) => void;
+  setUsageHistory: (history: UsageHistoryPoint[]) => void;
   setWokwiConnected: (connected: boolean) => void;
   setBackendConnected: (connected: boolean) => void;
   setSocketConnected: (connected: boolean) => void;
@@ -46,6 +49,25 @@ function pushActivity(state: State, ev: Omit<ActivityEvent, "eventId" | "created
   ].slice(0, 40);
 }
 
+const MAX_USAGE_HISTORY_POINTS = 48;
+
+function appendUsageHistoryPoint(
+  history: UsageHistoryPoint[],
+  point: UsageHistoryPoint
+): UsageHistoryPoint[] {
+  const existing = history[history.length - 1];
+  if (
+    existing &&
+    existing.timestamp === point.timestamp &&
+    existing.totalWatt === point.totalWatt &&
+    existing.estimatedKwhToday === point.estimatedKwhToday
+  ) {
+    return [...history.slice(0, -1), point];
+  }
+
+  return [...history, point].slice(-MAX_USAGE_HISTORY_POINTS);
+}
+
 export const useOfficeStore = create<State>((set, get) => ({
   devices: initialDevices,
   alerts: initialAlerts,
@@ -55,6 +77,7 @@ export const useOfficeStore = create<State>((set, get) => ({
   backendConnected: false,
   socketConnected: false,
   usage: null,
+  usageHistory: [],
 
   setDevices: (devices) =>
     set({
@@ -88,6 +111,24 @@ export const useOfficeStore = create<State>((set, get) => ({
 
   setAlerts: (alerts) => set({ alerts }),
 
+  setActivity: (activity) =>
+    set((s) => {
+      const merged = [...activity, ...s.activity];
+      const deduped = merged.filter(
+        (event, index) =>
+          merged.findIndex((candidate) => candidate.eventId === event.eventId) === index
+      );
+
+      return {
+        activity: deduped
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )
+          .slice(0, 40),
+      };
+    }),
+
   addAlert: (alert) =>
     set((s) => {
       const exists = s.alerts.some((a) => a.alertId === alert.alertId);
@@ -113,16 +154,38 @@ export const useOfficeStore = create<State>((set, get) => ({
           }
         });
       }
+      const timestamp = usageData?.timestamp ?? new Date().toISOString();
+      const normalizedUsage = usageData
+        ? {
+            totalWatt: usageData.totalWatt,
+            estimatedKwhToday: usageData.estimatedKwhToday,
+            roomWatts,
+            activeDeviceCount: usageData.activeDeviceCount,
+          }
+        : null;
+
       return {
-        usage: usageData
-          ? {
-              totalWatt: usageData.totalWatt,
-              estimatedKwhToday: usageData.estimatedKwhToday,
-              roomWatts,
-              activeDeviceCount: usageData.activeDeviceCount,
-            }
-          : null,
+        usage: normalizedUsage,
+        usageHistory: normalizedUsage
+          ? appendUsageHistoryPoint(s.usageHistory, {
+              timestamp,
+              totalWatt: normalizedUsage.totalWatt,
+              estimatedKwhToday: normalizedUsage.estimatedKwhToday,
+              roomWatts: normalizedUsage.roomWatts,
+              activeDeviceCount: normalizedUsage.activeDeviceCount,
+            })
+          : s.usageHistory,
       };
+    }),
+
+  setUsageHistory: (history) =>
+    set({
+      usageHistory: [...history]
+        .sort(
+          (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        )
+        .slice(-MAX_USAGE_HISTORY_POINTS),
     }),
 
   setWokwiConnected: (connected) =>
@@ -169,11 +232,31 @@ export const useOfficeStore = create<State>((set, get) => ({
         set({ backendConnected: true });
       }
     } catch (err: any) {
-      console.error("[Device Toggle] Backend request failed:", err?.message ?? err);
-      if (state.backendConnected) {
-        set({ backendConnected: false });
+      const message = err?.message ?? "Device control failed.";
+      const isNetworkFailure = /failed to fetch|networkerror|load failed/i.test(message);
+      const isMqttBridgeOffline = message.includes("MQTT broker is disconnected");
+
+      console.error("[Device Toggle] Backend request failed:", message);
+
+      if (isNetworkFailure) {
+        if (state.backendConnected) {
+          set({ backendConnected: false });
+        }
+        toast.error("Backend is offline. Device control is unavailable.");
+        return;
       }
-      toast.error("Backend is offline. Device control is unavailable.");
+
+      if (!state.backendConnected) {
+        set({ backendConnected: true });
+      }
+
+      if (isMqttBridgeOffline) {
+        get().setWokwiConnected(false);
+        toast.error("Drawing Room hardware bridge is offline. Device command was not sent.");
+        return;
+      }
+
+      toast.error(message);
     }
   },
 
@@ -300,6 +383,7 @@ export const useOfficeStore = create<State>((set, get) => ({
       backendConnected: false,
       socketConnected: false,
       usage: null,
+      usageHistory: [],
     }),
 
   tick: () => set({ lastUpdated: new Date().toISOString() }),

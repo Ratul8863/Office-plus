@@ -2,6 +2,7 @@ import { Client, GatewayIntentBits, Events } from "discord.js";
 import { hasDiscordToken, loadEnv } from "./config/env.js";
 import { logger } from "./utils/logger.js";
 import { handleMessage } from "./services/commandRouter.service.js";
+import { startAlertWatcher } from "./services/alertWatcher.service.js";
 
 async function main(): Promise<void> {
   if (!hasDiscordToken()) {
@@ -25,6 +26,7 @@ async function main(): Promise<void> {
 
   client.once(Events.ClientReady, (c) => {
     logger.info(`Logged in as ${c.user.tag} (id=${c.user.id})`);
+    startAlertWatcher(client);
   });
 
   client.on(Events.MessageCreate, (message) => {

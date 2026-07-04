@@ -12,8 +12,19 @@ import {
 } from "../socket/socketServer";
 
 const hardwareTopicPrefix = env.MQTT_HARDWARE_TOPIC_PREFIX.replace(/\/+$/, "");
+const HIVEMQ_PUBLIC_WSS_URL = "wss://broker.hivemq.com:8884/mqtt";
 
 let mqttClient: mqtt.MqttClient | null = null;
+let activeBrokerUrl: string | null = null;
+
+class MqttServiceUnavailableError extends Error {
+  status = 503;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "MqttServiceUnavailableError";
+  }
+}
 
 const deviceUpdateSchema = z.object({
   deviceId: z.string().min(1),
@@ -283,9 +294,37 @@ function handleJsonTelemetry(topic: string, rawPayload: string): void {
   applyDeviceUpdates(normalized.roomId, normalized.devices, "legacy telemetry");
 }
 
+function shouldPreferWebsocketBroker(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const hostedRuntime =
+      env.NODE_ENV === "production" ||
+      process.env.RENDER === "true" ||
+      Boolean(process.env.RENDER_EXTERNAL_HOSTNAME);
+
+    return (
+      hostedRuntime &&
+      parsed.protocol === "mqtt:" &&
+      parsed.hostname === "broker.hivemq.com" &&
+      (!parsed.port || parsed.port === "1883")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function resolveBrokerUrl(configuredBrokerUrl: string): string {
+  return shouldPreferWebsocketBroker(configuredBrokerUrl)
+    ? HIVEMQ_PUBLIC_WSS_URL
+    : configuredBrokerUrl;
+}
+
 function requireConnectedClient(): mqtt.MqttClient {
   if (!mqttClient || !mqttClient.connected) {
-    throw new Error("MQTT broker is disconnected. Hardware command was not sent.");
+    const brokerLabel = activeBrokerUrl ?? env.MQTT_BROKER_URL ?? "unconfigured";
+    throw new MqttServiceUnavailableError(
+      `MQTT broker is disconnected (${brokerLabel}). Hardware command was not sent.`
+    );
   }
   return mqttClient;
 }
@@ -332,10 +371,19 @@ export async function publishHardwareRoomCommand(
 }
 
 export const initMqttClient = (): void => {
-  const brokerUrl = env.MQTT_BROKER_URL;
-  if (!brokerUrl) {
+  const configuredBrokerUrl = env.MQTT_BROKER_URL;
+  if (!configuredBrokerUrl) {
     console.log("[MQTT] MQTT_BROKER_URL is not configured. MQTT bridge is disabled.");
     return;
+  }
+
+  const brokerUrl = resolveBrokerUrl(configuredBrokerUrl);
+  activeBrokerUrl = brokerUrl;
+
+  if (brokerUrl !== configuredBrokerUrl) {
+    console.log(
+      `[MQTT] Hosted runtime detected. Using websocket broker ${brokerUrl} instead of ${configuredBrokerUrl}.`
+    );
   }
 
   console.log(`[MQTT] Connecting to broker at ${brokerUrl}...`);
@@ -380,11 +428,11 @@ export const initMqttClient = (): void => {
     });
 
     mqttClient.on("error", (error) => {
-      console.error("[MQTT] Client connection error:", error.message);
+      console.error(`[MQTT] Client connection error on ${activeBrokerUrl}:`, error.message);
     });
 
     mqttClient.on("close", () => {
-      console.log("[MQTT] Connection closed.");
+      console.log(`[MQTT] Connection closed for ${activeBrokerUrl}.`);
     });
   } catch (error: any) {
     console.error("[MQTT] Fatal error initializing client:", error.message);

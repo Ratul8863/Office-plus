@@ -183,6 +183,15 @@ class BackendClient {
       this.handleError("getActiveAlerts", err);
     }
   }
+
+  async getAlerts(): Promise<Alert[]> {
+    try {
+      const res = await this.http.get<AlertsResponse>("/api/alerts");
+      return this.unwrap<Alert[]>(res);
+    } catch (err) {
+      this.handleError("getAlerts", err);
+    }
+  }
 }
 
 let _client: BackendClient | null = null;

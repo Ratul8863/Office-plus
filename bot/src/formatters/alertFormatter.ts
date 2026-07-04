@@ -27,7 +27,28 @@ export function formatAlerts(alerts: Alert[]): string {
   return lines.join("\n");
 }
 
-function formatTimestamp(iso: string): string {
+export function formatAlertTriggered(alert: Alert): string {
+  const emoji = SEVERITY_EMOJI[alert.severity] ?? "•";
+  const lines: string[] = [];
+  lines.push(`${emoji} New OfficePulse alert`);
+  lines.push("");
+  lines.push(`[${alert.severity.toUpperCase()}] ${alert.message}`);
+  lines.push(`Type: ${alert.type}`);
+  lines.push(`Triggered: ${formatTimestamp(alert.triggeredAt)}`);
+  return lines.join("\n");
+}
+
+export function formatAlertResolved(alert: Alert): string {
+  const lines: string[] = [];
+  lines.push("✅ OfficePulse alert resolved");
+  lines.push("");
+  lines.push(alert.message);
+  lines.push(`Type: ${alert.type}`);
+  lines.push(`Resolved: ${formatTimestamp(alert.resolvedAt || alert.triggeredAt)}`);
+  return lines.join("\n");
+}
+
+export function formatTimestamp(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   // Discord-friendly UTC stamp; we keep it short and avoid locale surprises.

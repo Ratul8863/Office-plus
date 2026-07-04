@@ -19,15 +19,15 @@ export interface Alert {
 
 class AlertService {
   private alerts: Alert[] = [];
-  private onAlertTriggered?: (alert: Alert) => void;
-  private onAlertResolved?: (alert: Alert) => void;
+  private onAlertTriggered: Array<(alert: Alert) => void> = [];
+  private onAlertResolved: Array<(alert: Alert) => void> = [];
 
   public registerCallbacks(
     onTriggered: (alert: Alert) => void,
     onResolved: (alert: Alert) => void
   ): void {
-    this.onAlertTriggered = onTriggered;
-    this.onAlertResolved = onResolved;
+    this.onAlertTriggered.push(onTriggered);
+    this.onAlertResolved.push(onResolved);
   }
 
   public getAlerts(): Alert[] {
@@ -76,8 +76,8 @@ class AlertService {
       void persistenceService.saveAlert(newAlert);
     }
 
-    if (this.onAlertTriggered) {
-      this.onAlertTriggered(newAlert);
+    for (const callback of this.onAlertTriggered) {
+      callback(newAlert);
     }
   }
 
@@ -107,8 +107,8 @@ class AlertService {
         );
       }
 
-      if (this.onAlertResolved) {
-        this.onAlertResolved(alert);
+      for (const callback of this.onAlertResolved) {
+        callback(alert);
       }
     }
   }

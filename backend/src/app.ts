@@ -9,8 +9,10 @@ import roomRoutes from "./routes/room.routes";
 import usageRoutes from "./routes/usage.routes";
 import alertRoutes from "./routes/alert.routes";
 import deviceRoutes from "./routes/device.routes";
+import integrationRoutes from "./routes/integration.routes";
 import telemetryRoutes from "./routes/telemetry.routes";
 import simulatorRoutes from "./routes/simulator.routes";
+import activityRoutes from "./routes/activity.routes";
 
 const app = express();
 
@@ -87,8 +89,10 @@ app.use("/api/rooms", roomRoutes);
 app.use("/api/usage", usageRoutes);
 app.use("/api/alerts", alertRoutes);
 app.use("/api/devices", deviceRoutes);
+app.use("/api/integrations", integrationRoutes);
 app.use("/api/telemetry", telemetryRoutes);
 app.use("/api/simulator", simulatorRoutes);
+app.use("/api/activity", activityRoutes);
 
 // Centralized error handler
 app.use(

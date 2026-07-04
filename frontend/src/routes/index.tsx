@@ -2,8 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Radio, Server, Zap } from "lucide-react";
 import { OfficeMap } from "@/components/office/OfficeMap";
-import { SummaryCards } from "@/components/dashboard/SummaryCards";
-import { RoomBreakdown } from "@/components/dashboard/RoomBreakdown";
+import { PowerAnalyticsPanel } from "@/components/dashboard/PowerAnalyticsPanel";
+import { SmartAutomationPanel } from "@/components/dashboard/SmartAutomationPanel";
+import { DiscordBotPanel } from "@/components/dashboard/DiscordBotPanel";
 import { AlertsPanel } from "@/components/alerts/AlertsPanel";
 import { ActivityFeed } from "@/components/activity/ActivityFeed";
 import { DeviceGrid } from "@/components/devices/DeviceGrid";
@@ -51,12 +52,13 @@ function DashboardPage() {
         </div>
       </header>
 
-      <SummaryCards />
-      <OfficeMap />
+      <PowerAnalyticsPanel />
+      <SmartAutomationPanel />
+      <DiscordBotPanel />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="xl:col-span-2 space-y-4">
-          <RoomBreakdown />
+          <OfficeMap />
           <DeviceGrid />
         </div>
         <div className="space-y-4">

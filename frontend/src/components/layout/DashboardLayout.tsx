@@ -16,6 +16,7 @@ import { initSocket, disconnectSocket } from "@/services/socketClient";
 import { officeApi } from "@/services/officeApi";
 import { usageApi } from "@/services/usageApi";
 import { alertApi } from "@/services/alertApi";
+import { activityApi } from "@/services/activityApi";
 import { Toaster } from "@/components/ui/sonner";
 
 const NAV = [
@@ -26,10 +27,14 @@ const NAV = [
   { to: "/simulation", label: "Simulation", icon: Sliders },
 ];
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export function DashboardLayout() {
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  
+
   const alerts = useOfficeStore((s) => s.alerts);
   const activeAlerts = alerts.filter((a) => a.active).length;
   const wokwi = useOfficeStore((s) => s.wokwiConnected);
@@ -43,35 +48,41 @@ export function DashboardLayout() {
     const fetchInitialData = async () => {
       try {
         console.log("[DashboardLayout] Fetching initial state from backend...");
-        const devices = await officeApi.getState();
-        const usage = await usageApi.getUsage();
-        const activeAlertsData = await alertApi.getAlerts();
+        const [devices, usage] = await Promise.all([officeApi.getState(), usageApi.getUsage()]);
 
         const store = useOfficeStore.getState();
         store.setDevices(devices);
         store.setUsage(usage);
 
-        // Map backend alerts to the frontend structure
-        const mappedAlerts = activeAlertsData.map((a: any) => ({
-          alertId: a.id,
-          type: a.type,
-          severity: a.severity,
-          roomId: a.roomId,
-          deviceId: a.deviceId,
-          message: a.message,
-          active: a.status === "active",
-          createdAt: a.triggeredAt,
-          resolvedAt: a.resolvedAt || undefined,
-        }));
-        store.setAlerts(mappedAlerts);
-        
+        const [activeAlertsResult] = await Promise.allSettled([alertApi.getAlerts()]);
+
+        if (activeAlertsResult.status === "fulfilled") {
+          const mappedAlerts = activeAlertsResult.value.map((a) => ({
+            alertId: a.id,
+            type: a.type,
+            severity: a.severity,
+            roomId: a.roomId,
+            deviceId: a.deviceId,
+            message: a.message,
+            active: a.status === "active",
+            createdAt: a.triggeredAt,
+            resolvedAt: a.resolvedAt || undefined,
+          }));
+          store.setAlerts(mappedAlerts);
+        } else {
+          console.warn(
+            "[DashboardLayout] Alerts feed unavailable during boot:",
+            activeAlertsResult.reason,
+          );
+        }
+
         // Mark backend as reachable
         store.setBackendConnected(true);
         console.log("[DashboardLayout] Backend connected and initial data loaded.");
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.warn(
           "[DashboardLayout] Backend unreachable, falling back to mock data:",
-          err.message
+          getErrorMessage(err),
         );
         useOfficeStore.getState().setBackendConnected(false);
       }
@@ -89,8 +100,7 @@ export function DashboardLayout() {
           headers: { Accept: "application/json" },
         });
         const body = await res.json().catch(() => null);
-        const ok =
-          res.ok && body && (body.success === undefined ? true : body.success);
+        const ok = res.ok && body && (body.success === undefined ? true : body.success);
         useOfficeStore.getState().setBackendConnected(Boolean(ok));
       } catch {
         useOfficeStore.getState().setBackendConnected(false);
@@ -109,6 +119,51 @@ export function DashboardLayout() {
       disconnectSocket();
     };
   }, []);
+
+  useEffect(() => {
+    const fetchRouteSupportData = async () => {
+      if (pathname === "/") {
+        const [usageHistoryResult, activityHistoryResult] = await Promise.allSettled([
+          usageApi.getHistory(24),
+          activityApi.getRecent(40),
+        ]);
+
+        if (usageHistoryResult.status === "fulfilled") {
+          useOfficeStore.getState().setUsageHistory(usageHistoryResult.value);
+        } else {
+          console.warn(
+            "[DashboardLayout] Usage history unavailable during boot:",
+            usageHistoryResult.reason,
+          );
+        }
+
+        if (activityHistoryResult.status === "fulfilled") {
+          useOfficeStore.getState().setActivity(activityHistoryResult.value);
+        } else {
+          console.warn(
+            "[DashboardLayout] Activity feed unavailable during boot:",
+            activityHistoryResult.reason,
+          );
+        }
+
+        return;
+      }
+
+      if (pathname === "/architecture") {
+        try {
+          const activity = await activityApi.getRecent(40);
+          useOfficeStore.getState().setActivity(activity);
+        } catch (error: unknown) {
+          console.warn(
+            "[DashboardLayout] Activity feed unavailable on architecture route:",
+            getErrorMessage(error),
+          );
+        }
+      }
+    };
+
+    fetchRouteSupportData();
+  }, [pathname]);
 
   return (
     <div className="min-h-screen bg-background text-foreground bg-grid">
@@ -138,7 +193,7 @@ export function DashboardLayout() {
         >
           <div className="flex h-full flex-col p-5">
             <Link to="/" className="flex items-center gap-3 pb-6">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-primary to-accent shadow-glow">
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-linear-to-br from-primary to-accent shadow-glow">
                 <Zap className="h-5 w-5 text-primary-foreground" />
               </div>
               <div className="min-w-0">

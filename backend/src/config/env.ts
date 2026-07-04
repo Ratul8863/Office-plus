@@ -9,6 +9,27 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(5000),
   NODE_ENV: z.string().default("development"),
   CLIENT_URL: z.string().default("http://localhost:5173"),
+  DISCORD_TOKEN: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((val: string | null | undefined) => (val === "" ? undefined : val)),
+  DISCORD_CHANNEL_ID: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((val: string | null | undefined) => (val === "" ? undefined : val)),
+  DISCORD_BOT_INVITE_URL: z
+    .string()
+    .url()
+    .default(
+      "https://discord.com/oauth2/authorize?client_id=1522604103245496400&permissions=115712&integration_type=0&scope=bot+applications.commands"
+    ),
+  DISCORD_COMMAND_PREFIX: z.string().min(1).default("!"),
+  DISCORD_ALERT_NOTIFICATIONS_ENABLED: z.preprocess(
+    (val: unknown) => val === "true" || val === true || val === "1",
+    z.boolean()
+  ).default(true),
   ENABLE_SIMULATOR: z.preprocess(
     (val: unknown) => val === "true" || val === true || val === "1",
     z.boolean()

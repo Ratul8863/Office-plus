@@ -48,6 +48,14 @@ export interface Usage {
   activeDeviceCount: number;
 }
 
+export interface UsageHistoryPoint {
+  timestamp: string;
+  totalWatt: number;
+  estimatedKwhToday: number;
+  roomWatts: { drawing: number; work1: number; work2: number };
+  activeDeviceCount: number;
+}
+
 export interface ActivityEvent {
   eventId: string;
   type: "DEVICE_CHANGED" | "ALERT_CREATED" | "TELEMETRY_RECEIVED" | "SYSTEM";
@@ -55,4 +63,19 @@ export interface ActivityEvent {
   roomId?: RoomId;
   deviceId?: string;
   createdAt: string;
+}
+
+export interface DiscordCommandInfo {
+  name: string;
+  syntax: string;
+  description: string;
+}
+
+export interface DiscordIntegrationOverview {
+  architecture: "standalone-bot" | "embedded-backend-bot";
+  inviteUrl: string;
+  commandPrefix: string;
+  automaticAlertBroadcast: boolean;
+  supportedCommands: DiscordCommandInfo[];
+  notes: string[];
 }
