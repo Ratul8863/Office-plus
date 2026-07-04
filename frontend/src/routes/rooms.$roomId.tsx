@@ -63,8 +63,8 @@ function RoomDetailPage() {
       const result = await roomApi.setMasterState(rid, status);
       toast.success(
         result.mode === "hardware-queued"
-          ? `Drawing Room master command sent (${status.toUpperCase()}).`
-          : `${meta.name} set to ${status.toUpperCase()}.`
+          ? `${meta.name} master command sent via MQTT (${status.toUpperCase()}).`
+          : `${meta.name} all devices set to ${status.toUpperCase()}.`
       );
     } catch (error: any) {
       toast.error(error?.message ?? "Room command failed.");
@@ -218,39 +218,48 @@ function RoomDetailPage() {
 
         {/* Right column */}
         <div className="space-y-4 min-w-0">
-          {isHardwareRoom && (
-            <div className="rounded-2xl border border-cyan-400/30 bg-cyan-500/5 p-5 backdrop-blur">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200/80">
-                    Hackathon Bridge
-                  </div>
-                  <h2 className="mt-1 text-xl font-bold">Master Room Control</h2>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Push one command to the ESP32 room bus and let the hardware publish the confirmed
-                    state back into OfficePulse.
-                  </p>
+          <div className={`rounded-2xl border p-5 backdrop-blur ${
+            isHardwareRoom
+              ? "border-cyan-400/30 bg-cyan-500/5"
+              : "border-accent/30 bg-accent/5"
+          }`}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className={`text-[10px] font-bold uppercase tracking-[0.22em] ${
+                  isHardwareRoom ? "text-cyan-200/80" : "text-accent/80"
+                }`}>
+                  {isHardwareRoom ? "Hackathon Bridge" : "Room Control"}
                 </div>
-                <div className="rounded-full border border-cyan-400/30 bg-background/50 px-3 py-1 text-[11px] font-mono text-cyan-200">
-                  MQTT · smartoffice/drawing
-                </div>
+                <h2 className="mt-1 text-xl font-bold">Master Room Control</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {isHardwareRoom
+                    ? "Push one command to the ESP32 room bus and let the hardware publish the confirmed state back into OfficePulse."
+                    : `Toggle all devices in ${meta.name} at once via the simulator backend.`}
+                </p>
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <button
-                  onClick={() => handleMasterControl("on")}
-                  disabled={masterBusy !== null}
-                  className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm font-bold text-emerald-200 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {masterBusy === "on" ? "Sending..." : "All Lights + Fans ON"}
-                </button>
-                <button
-                  onClick={() => handleMasterControl("off")}
-                  disabled={masterBusy !== null}
-                  className="rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {masterBusy === "off" ? "Sending..." : "All Lights + Fans OFF"}
-                </button>
+              <div className={`rounded-full border bg-background/50 px-3 py-1 text-[11px] font-mono ${
+                isHardwareRoom ? "border-cyan-400/30 text-cyan-200" : "border-accent/30 text-accent"
+              }`}>
+                {isHardwareRoom ? "MQTT · smartoffice/drawing" : "Simulator · Direct"}
               </div>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <button
+                onClick={() => handleMasterControl("on")}
+                disabled={masterBusy !== null}
+                className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm font-bold text-emerald-200 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {masterBusy === "on" ? "Sending..." : "All Lights + Fans ON"}
+              </button>
+              <button
+                onClick={() => handleMasterControl("off")}
+                disabled={masterBusy !== null}
+                className="rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {masterBusy === "off" ? "Sending..." : "All Lights + Fans OFF"}
+              </button>
+            </div>
+            {isHardwareRoom && (
               <div className="mt-4 grid gap-2 text-[11px] text-muted-foreground">
                 <div className="rounded-xl border border-border/40 bg-background/40 px-3 py-2">
                   {"Web command -> backend -> MQTT -> ESP32 -> state echo -> live UI"}
@@ -260,8 +269,8 @@ function RoomDetailPage() {
                   website's master switch inside your main dashboard.
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="rounded-2xl border border-border/40 bg-card/40 p-5 backdrop-blur">
             <h2 className="mb-4 text-xl font-bold">Active Devices</h2>
