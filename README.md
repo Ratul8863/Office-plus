@@ -33,6 +33,8 @@ This repo solves that by putting the backend in the middle and letting every oth
 
 ## System Architecture
 
+![OfficePulse System Architecture](assets/system-architecture.png)
+
 ```mermaid
 flowchart LR
   UI[Frontend Dashboard<br/>React + Vite + TanStack] -->|REST commands| API[Backend API<br/>Express + Socket.IO]
