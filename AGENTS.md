@@ -15,3 +15,4 @@
 ## Learned Workspace Facts
 - The repo includes a hardware-backed MQTT integration under `IUT-Hackathon-IoT-Circuit-` using the `smartoffice/drawing/` topic family.
 - The `drawing` room is wired to the hardware path, with main app control flowing `frontend -> backend API -> backend MQTT -> hardware -> backend -> Socket.IO -> frontend`.
+- The frontend consumes live office updates over Socket.IO, while the Discord bot reads backend state through HTTP/API flows rather than subscribing to Socket.IO directly.

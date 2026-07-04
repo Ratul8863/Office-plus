@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Bot,
   Leaf,
@@ -6,15 +6,12 @@ import {
   Power,
   RotateCcw,
   Sparkles,
-  SunMedium,
   Trees,
-  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { officeApi } from "@/services/officeApi";
 import { useOfficeStore } from "@/store/officeStore";
-import { computeUsage, formatKwh, ROOM_META } from "@/utils/office";
-import type { Device, RoomId } from "@/types";
+import type { Device } from "@/types";
 
 type AutomationMode = "normal" | "eco" | "night" | "vacation";
 
@@ -63,8 +60,6 @@ const MODE_META: Record<
   },
 };
 
-const MAX_DAILY_KWH_BASELINE = 5.94;
-
 function captureSnapshot(devices: Device[]) {
   return Object.fromEntries(
     devices.map((device) => [device.deviceId, device.status])
@@ -110,37 +105,12 @@ function buildUndoPlan(
 
 export function SmartAutomationPanel() {
   const devices = useOfficeStore((s) => s.devices);
-  const activity = useOfficeStore((s) => s.activity);
-  const usage = useOfficeStore((s) => s.usage);
   const backendConnected = useOfficeStore((s) => s.backendConnected);
   const socketConnected = useOfficeStore((s) => s.socketConnected);
 
   const [activeMode, setActiveMode] = useState<AutomationMode>("normal");
   const [busyState, setBusyState] = useState<AutomationMode | "undo" | null>(null);
   const [lastSnapshot, setLastSnapshot] = useState<Record<string, Device["status"]> | null>(null);
-  const [modeRuns, setModeRuns] = useState(0);
-  const [modeSuccesses, setModeSuccesses] = useState(0);
-  const liveUsage = usage || computeUsage(devices);
-
-  const roomStatus = useMemo(
-    () =>
-      (["drawing", "work1", "work2"] as RoomId[]).map((roomId) => {
-        const roomDevices = devices.filter((device) => device.roomId === roomId);
-        const activeCount = roomDevices.filter((device) => device.status === "on").length;
-        return {
-          roomId,
-          name: ROOM_META[roomId].name,
-          occupied: activeCount > 0,
-        };
-      }),
-    [devices]
-  );
-
-  const actionsToday = activity.filter((event) => event.type === "DEVICE_CHANGED").length;
-  const devicesOff = devices.filter((device) => device.status === "off").length;
-  const estimatedKwhToday = liveUsage.estimatedKwhToday;
-  const kwhSaved = Math.max(0, MAX_DAILY_KWH_BASELINE - estimatedKwhToday);
-  const successRate = modeRuns === 0 ? 100 : Math.round((modeSuccesses / modeRuns) * 100);
 
   async function runCommands(
     commands: DeviceCommand[],
@@ -160,11 +130,6 @@ export function SmartAutomationPanel() {
       } catch (error: any) {
         failures.push(error?.message ?? `Failed to update ${command.deviceId}`);
       }
-    }
-
-    setModeRuns((current) => current + 1);
-    if (failures.length === 0) {
-      setModeSuccesses((current) => current + 1);
     }
 
     if (commands.length === 0) {
@@ -299,73 +264,6 @@ export function SmartAutomationPanel() {
         })}
       </div>
 
-      <div className="mt-5 rounded-[24px] border border-border/40 bg-background/25 p-4">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-          <Users className="h-4 w-4 text-cyan-300" />
-          Room Occupancy Sensors
-        </div>
-        <div className="grid gap-3 lg:grid-cols-3">
-          {roomStatus.map((room) => (
-            <div
-              key={room.roomId}
-              className={`rounded-2xl border px-4 py-3 ${
-                room.occupied
-                  ? "border-emerald-400/25 bg-emerald-500/10"
-                  : "border-border/40 bg-background/30"
-              }`}
-            >
-              <div className="font-semibold">{room.name}</div>
-              <div
-                className={`mt-1 inline-flex items-center gap-2 text-sm ${
-                  room.occupied ? "text-emerald-300" : "text-muted-foreground"
-                }`}
-              >
-                <span
-                  className={`h-2 w-2 rounded-full ${
-                    room.occupied ? "bg-emerald-300" : "bg-muted-foreground"
-                  }`}
-                />
-                {room.occupied ? "Occupied" : "Empty"}
-              </div>
-            </div>
-          ))}
-        </div>
-        <p className="mt-3 text-xs text-muted-foreground">
-          Current occupancy is inferred from live room activity until dedicated sensor telemetry is added.
-        </p>
-      </div>
-
-      <div className="mt-5 grid gap-3 lg:grid-cols-5">
-        <MetricCard label="Actions Today" value={String(actionsToday)} />
-        <MetricCard label="kWh Saved" value={formatKwh(kwhSaved)} />
-        <MetricCard label="Devices Off" value={String(devicesOff)} />
-        <MetricCard label="Top Rule" value={MODE_META[activeMode].ruleLabel} compact />
-        <MetricCard label="Success Rate" value={`${successRate}%`} />
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <SunMedium className="h-3.5 w-3.5 text-amber-300" />
-        Normal turns every device on, Eco keeps one fan + one light per room, Night leaves a single security light in Drawing Room, and Vacation powers the building down.
-      </div>
     </section>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  compact = false,
-}: {
-  label: string;
-  value: string;
-  compact?: boolean;
-}) {
-  return (
-    <div className="rounded-2xl border border-border/40 bg-background/25 px-4 py-3">
-      <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
-      <div className={`mt-2 font-semibold ${compact ? "text-lg" : "text-2xl"} text-foreground`}>
-        {value}
-      </div>
-    </div>
   );
 }
