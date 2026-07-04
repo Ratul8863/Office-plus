@@ -40,8 +40,8 @@ const PRESETS = [
   },
   {
     key: "DEVICE_OFFLINE" as const,
-    title: "Wokwi Disconnect",
-    subtitle: "Hardware failure testing",
+    title: "Hardware Disconnect",
+    subtitle: "Drawing Room bridge failure testing",
     icon: WifiOff,
   },
 ];
@@ -247,7 +247,7 @@ function SimulationPage() {
             </div>
             <p className="mt-3 flex items-center gap-2 text-[11px] text-muted-foreground">
               <Zap className="h-3 w-3" />
-              Toggles a random simulator-source device (Drawing Room or Work Room 2).
+              Toggles a random simulator-source device (Work Room 1 or Work Room 2).
               Manual device control always works — this only drives random auto-ticking.
             </p>
           </Panel>
@@ -308,7 +308,7 @@ function SimulationPage() {
                 </span>
               </div>
               <div className="flex items-center justify-between rounded-lg border border-border/40 bg-background/40 px-3 py-2 text-sm">
-                <span className="text-muted-foreground">Wokwi Connection</span>
+                <span className="text-muted-foreground">Hardware Bridge</span>
                 <span className={`inline-flex items-center gap-1.5 font-mono ${wokwi ? "text-emerald-300" : "text-red-300"}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${wokwi ? "bg-emerald-300" : "bg-red-300"}`} />
                   {wokwi ? "Connected" : "Disconnected"}
@@ -367,7 +367,7 @@ function SimulationPage() {
                   {Object.entries(ROOM_META).map(([id, m]) => (
                     <div key={id} className="rounded-lg border border-border/40 bg-background/50 p-2 text-center">
                       <div className="text-[9px] uppercase tracking-widest text-muted-foreground">
-                        {m.source}
+                        {m.sourceLabel}
                       </div>
                       <div className="text-xs font-bold truncate">{m.name.split(" ")[0]}</div>
                     </div>

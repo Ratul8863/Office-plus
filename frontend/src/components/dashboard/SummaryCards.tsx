@@ -41,7 +41,7 @@ export function SummaryCards() {
     },
     {
       label: "Live Source",
-      value: wokwi ? "Wokwi + Sim" : "Sim Only",
+      value: wokwi ? "Hardware + Sim" : "Sim Only",
       icon: Radio,
       tone: wokwi ? "text-emerald-300" : "text-destructive",
       accent: wokwi ? "from-emerald-500/20 to-transparent" : "from-destructive/20 to-transparent",

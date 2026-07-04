@@ -133,8 +133,10 @@ export const useOfficeStore = create<State>((set, get) => ({
         activity: changed
           ? pushActivity(s, {
               type: "SYSTEM",
-              message: connected ? "Wokwi Gateway connected" : "Wokwi Gateway went offline",
-              roomId: "work1",
+              message: connected
+                ? "Drawing Room hardware bridge connected"
+                : "Drawing Room hardware bridge went offline",
+              roomId: "drawing",
             })
           : s.activity,
       };
@@ -149,20 +151,18 @@ export const useOfficeStore = create<State>((set, get) => ({
     const d = state.devices.find((x) => x.deviceId === id);
     if (!d) return;
 
-    // Wokwi reservation: Work Room 1 is driven by hardware telemetry and
-    // must never be toggled from the UI.
-    if (d.source === "wokwi" || d.roomId === "work1") {
-      console.log(`[Device Toggle] Blocked — ${id} is reserved for Wokwi telemetry`);
-      toast.error("Work Room 1 is controlled by Wokwi telemetry.");
-      return;
-    }
-
     console.log("[Device Toggle]", id);
 
     try {
-      const updatedDevice = await officeApi.toggleDevice(id);
-      console.log("[Device Toggle Response]", updatedDevice);
-      get().updateSingleDevice(updatedDevice);
+      const result = await officeApi.toggleDevice(id);
+      console.log("[Device Toggle Response]", result);
+      if (result.mode === "direct") {
+        get().updateSingleDevice(result.device);
+      } else {
+        toast.success(
+          `${d.name} command sent to Drawing Room hardware (${result.targetStatus.toUpperCase()}).`
+        );
+      }
       if (!state.backendConnected) {
         // First successful call after a previously failed initial fetch —
         // flip the flag so the rest of the UI reflects live mode.
@@ -196,6 +196,7 @@ export const useOfficeStore = create<State>((set, get) => ({
   randomize: () =>
     set((s) => {
       const devices = s.devices.map((d) => {
+        if (d.source === "wokwi") return d;
         const on = Math.random() > 0.45;
         return {
           ...d,
@@ -235,7 +236,8 @@ export const useOfficeStore = create<State>((set, get) => ({
         DEVICE_OFFLINE: {
           type: "DEVICE_OFFLINE",
           severity: "critical",
-          message: "Wokwi telemetry not received for 60 seconds.",
+          roomId: "drawing",
+          message: "Drawing Room hardware telemetry not received for 60 seconds.",
         },
       };
       const alert: Alert = {
@@ -257,7 +259,11 @@ export const useOfficeStore = create<State>((set, get) => ({
   simulateWokwiDisconnect: () =>
     set((s) => ({
       wokwiConnected: false,
-      activity: pushActivity(s, { type: "SYSTEM", message: "Wokwi disconnect simulated" }),
+      activity: pushActivity(s, {
+        type: "SYSTEM",
+        message: "Drawing Room hardware disconnect simulated",
+        roomId: "drawing",
+      }),
     })),
 
   reconnectWokwi: () => set({ wokwiConnected: true }),

@@ -88,8 +88,8 @@ export const initialActivity: ActivityEvent[] = [
   {
     eventId: "e1",
     type: "TELEMETRY_RECEIVED",
-    message: "Wokwi telemetry received for Work Room 1",
-    roomId: "work1",
+    message: "Drawing Room hardware telemetry received",
+    roomId: "drawing",
     createdAt: demoIso(0, 20),
   },
   {

@@ -1,39 +1,19 @@
 import mqtt from "mqtt";
 import { z } from "zod";
 import { env } from "../config/env";
+import { HARDWARE_ROOM_ID } from "../config/device.config";
 import { officeStateService } from "../services/officeState.service";
 import { powerCalculatorService } from "../services/powerCalculator.service";
 import { alertService } from "../services/alert.service";
 import {
+  emitConnectionStatus,
   emitDeviceChanged,
   emitUsageUpdated,
-  emitConnectionStatus,
 } from "../socket/socketServer";
 
-// -----------------------------------------------------------------------------
-// Zod schemas for the two telemetry payload formats we accept.
-//
-//   1) Standard (multi-device) — what the Wokwi firmware actually emits today:
-//
-//        {
-//          "source": "wokwi",
-//          "roomId": "work1",
-//          "timestamp": "2026-07-03T21:05:05Z",
-//          "devices": [
-//            { "deviceId": "work1-fan-1", "status": "on" },
-//            ...
-//          ]
-//        }
-//
-//   2) Compact (single-device, snake_case) — useful for `mosquitto_pub` from
-//      a CLI when the user wants to flip one device without assembling a full
-//      array. The backend normalises it to the standard form before applying.
-//
-//        { "deviceId": "work1_fan_1", "status": "ON", "roomId": "work1" }
-//
-// Anything else (extra fields, wrong room, unknown deviceId, malformed JSON)
-// is rejected with a single-line warning — the consumer must never crash.
-// -----------------------------------------------------------------------------
+const hardwareTopicPrefix = env.MQTT_HARDWARE_TOPIC_PREFIX.replace(/\/+$/, "");
+
+let mqttClient: mqtt.MqttClient | null = null;
 
 const deviceUpdateSchema = z.object({
   deviceId: z.string().min(1),
@@ -61,83 +41,67 @@ const compactPayloadSchema = z.object({
   timestamp: z.string().optional(),
 });
 
-/**
- * Normalise a compact device id (`work1_fan_1`) to the canonical dash-delimited
- * id (`work1-fan-1`). Only devices of the form `<room>_<type>_<n>` are
- * supported; any other shape is left untouched so the downstream Zod check
- * rejects it with a clear error.
- */
 function normalizeCompactDeviceId(rawId: string): string {
-  // Fast path: already in canonical form.
   if (rawId.includes("-")) return rawId;
-  // Pattern: room-type-N, e.g. work1_fan_1 / drawing_light_3.
-  const m = rawId.match(/^([a-z0-9]+)_(fan|light)_(\d+)$/i);
-  if (!m) return rawId;
-  return `${m[1]}-${m[2].toLowerCase()}-${m[3]}`;
+  const match = rawId.match(/^([a-z0-9]+)_(fan|light)_(\d+)$/i);
+  if (!match) return rawId;
+  return `${match[1]}-${match[2].toLowerCase()}-${match[3]}`;
 }
 
-/** Map any accepted status shape onto the canonical `"on" | "off"`. */
 function normalizeStatus(rawStatus: unknown): "on" | "off" | null {
   if (rawStatus === true) return "on";
   if (rawStatus === false) return "off";
   if (typeof rawStatus !== "string") return null;
-  const s = rawStatus.trim().toLowerCase();
-  if (s === "on") return "on";
-  if (s === "off") return "off";
+  const status = rawStatus.trim().toLowerCase();
+  if (status === "on" || status === "1" || status === "true") return "on";
+  if (status === "off" || status === "0" || status === "false") return "off";
   return null;
 }
 
-/**
- * Convert either accepted payload shape into the standard
- * `{ roomId, devices: [{ deviceId, status }, ...] }` form. Returns
- * `null` if the payload can't be coerced — caller logs and drops it.
- */
-function normalizeTelemetry(raw: unknown):
-  | { roomId: string; devices: Array<{ deviceId: string; status: "on" | "off" }>; format: "multi" | "compact" }
+function normalizeTelemetry(
+  raw: unknown
+):
+  | {
+      roomId: string;
+      devices: Array<{ deviceId: string; status: "on" | "off" }>;
+      format: "multi" | "compact";
+    }
   | null {
   if (!raw || typeof raw !== "object") return null;
   const obj = raw as Record<string, unknown>;
 
-  // ---- Compact single-device payload ---------------------------------------
   if (typeof obj.deviceId === "string" && obj.devices === undefined) {
     const parsed = compactPayloadSchema.safeParse(obj);
     if (!parsed.success) {
-      console.warn(
-        `[MQTT] Compact payload rejected by Zod: ${parsed.error.message}`
-      );
+      console.warn(`[MQTT] Compact payload rejected by Zod: ${parsed.error.message}`);
       return null;
     }
     const deviceId = normalizeCompactDeviceId(parsed.data.deviceId);
     const status = normalizeStatus(parsed.data.status);
     if (!status) {
       console.warn(
-        `[MQTT] Compact payload has unrecognised status: ${String(
-          parsed.data.status
-        )}`
+        `[MQTT] Compact payload has unrecognised status: ${String(parsed.data.status)}`
       );
       return null;
     }
     return {
-      roomId: parsed.data.roomId ?? "work1",
+      roomId: parsed.data.roomId ?? HARDWARE_ROOM_ID,
       devices: [{ deviceId, status }],
       format: "compact",
     };
   }
 
-  // ---- Multi-device array payload ------------------------------------------
   if (Array.isArray(obj.devices)) {
     const parsed = multiDevicePayloadSchema.safeParse(obj);
     if (!parsed.success) {
-      console.warn(
-        `[MQTT] Multi-device payload rejected by Zod: ${parsed.error.message}`
-      );
+      console.warn(`[MQTT] Multi-device payload rejected by Zod: ${parsed.error.message}`);
       return null;
     }
     const devices: Array<{ deviceId: string; status: "on" | "off" }> = [];
-    for (const d of parsed.data.devices) {
-      const status = normalizeStatus(d.status);
+    for (const device of parsed.data.devices) {
+      const status = normalizeStatus(device.status);
       if (!status) continue;
-      devices.push({ deviceId: d.deviceId, status });
+      devices.push({ deviceId: device.deviceId, status });
     }
     if (devices.length === 0) return null;
     return { roomId: parsed.data.roomId, devices, format: "multi" };
@@ -146,16 +110,231 @@ function normalizeTelemetry(raw: unknown):
   return null;
 }
 
-// -----------------------------------------------------------------------------
-// MQTT wiring
-// -----------------------------------------------------------------------------
+function canonicalDeviceIdFromShort(roomId: string, shortId: string): string | null {
+  const match = shortId.match(/^(light|fan)(\d+)$/i);
+  if (!match) return null;
+  return `${roomId}-${match[1].toLowerCase()}-${match[2]}`;
+}
+
+function shortDeviceIdFromCanonical(deviceId: string): string | null {
+  const match = deviceId.match(/^([a-z0-9]+)-(light|fan)-(\d+)$/i);
+  if (!match) return null;
+  return `${match[2].toLowerCase()}${match[3]}`;
+}
+
+function applyDeviceUpdates(
+  roomId: string,
+  devices: Array<{ deviceId: string; status: "on" | "off" }>,
+  sourceLabel: string
+): void {
+  if (roomId !== HARDWARE_ROOM_ID) {
+    console.warn(
+      `[MQTT] Rejected ${sourceLabel} update for roomId "${roomId}" — only "${HARDWARE_ROOM_ID}" is accepted.`
+    );
+    return;
+  }
+
+  const connectionTransitioned = officeStateService.setWokwiTelemetryReceived();
+  if (connectionTransitioned) {
+    emitConnectionStatus({
+      source: "wokwi",
+      online: true,
+      lastSeen: new Date().toISOString(),
+    });
+  }
+
+  let stateChanged = false;
+  let appliedCount = 0;
+  let skippedCount = 0;
+
+  for (const nextDevice of devices) {
+    if (!nextDevice.deviceId.startsWith(`${roomId}-`)) {
+      console.warn(
+        `[MQTT] Blocked device update for ${nextDevice.deviceId} — outside ${roomId}.`
+      );
+      skippedCount += 1;
+      continue;
+    }
+
+    const currentDevice = officeStateService.getDevice(nextDevice.deviceId);
+    if (!currentDevice) {
+      console.warn(`[MQTT] Unknown deviceId ${nextDevice.deviceId} — ignored.`);
+      skippedCount += 1;
+      continue;
+    }
+
+    if (currentDevice.status === nextDevice.status) continue;
+
+    try {
+      const previousStatus = currentDevice.status;
+      if (nextDevice.status === "off") {
+        powerCalculatorService.recordDeviceTurnOff(currentDevice);
+      }
+
+      const { device, changed } = officeStateService.updateDeviceState(
+        nextDevice.deviceId,
+        nextDevice.status
+      );
+
+      if (changed) {
+        stateChanged = true;
+        appliedCount += 1;
+        console.log(
+          `[MQTT] ${sourceLabel}: ${device.deviceId} ${previousStatus} -> ${device.status}`
+        );
+        emitDeviceChanged(device);
+      }
+    } catch (error: any) {
+      console.error(
+        `[MQTT] Error updating device ${nextDevice.deviceId}: ${error?.message ?? error}`
+      );
+      skippedCount += 1;
+    }
+  }
+
+  console.log(
+    `[MQTT] ${sourceLabel} applied: ${appliedCount} changed, ${skippedCount} skipped.`
+  );
+
+  if (stateChanged || connectionTransitioned) {
+    const usage = powerCalculatorService.getUsage();
+    alertService.evaluateAlerts();
+    emitUsageUpdated(usage);
+  }
+}
+
+function handleHardwareTopicMessage(topic: string, rawPayload: string): boolean {
+  if (!topic.startsWith(`${hardwareTopicPrefix}/`)) return false;
+
+  const suffix = topic.slice(hardwareTopicPrefix.length + 1);
+  const [target, action] = suffix.split("/");
+  if (!target || !action) return true;
+
+  if (action === "set") {
+    console.log(`[MQTT] Ignoring command echo on ${topic}`);
+    return true;
+  }
+
+  if (action !== "state") {
+    console.warn(`[MQTT] Ignored unsupported hardware topic ${topic}`);
+    return true;
+  }
+
+  const status = normalizeStatus(rawPayload);
+  if (target === "motion") {
+    const connectionTransitioned = officeStateService.setWokwiTelemetryReceived();
+    if (connectionTransitioned) {
+      emitConnectionStatus({
+        source: "wokwi",
+        online: true,
+        lastSeen: new Date().toISOString(),
+      });
+    }
+    console.log(`[MQTT] Motion update for ${HARDWARE_ROOM_ID}: ${rawPayload}`);
+    return true;
+  }
+
+  if (!status) {
+    console.warn(`[MQTT] Ignored hardware payload with invalid status: ${rawPayload}`);
+    return true;
+  }
+
+  if (target === "master") {
+    const roomDevices = officeStateService
+      .getDevices()
+      .filter((device) => device.roomId === HARDWARE_ROOM_ID)
+      .map((device) => ({ deviceId: device.deviceId, status }));
+    applyDeviceUpdates(HARDWARE_ROOM_ID, roomDevices, "hardware master state");
+    return true;
+  }
+
+  const deviceId = canonicalDeviceIdFromShort(HARDWARE_ROOM_ID, target);
+  if (!deviceId) {
+    console.warn(`[MQTT] Ignored unknown hardware device key "${target}"`);
+    return true;
+  }
+
+  applyDeviceUpdates(
+    HARDWARE_ROOM_ID,
+    [{ deviceId, status }],
+    "hardware direct topic"
+  );
+  return true;
+}
+
+function handleJsonTelemetry(topic: string, rawPayload: string): void {
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(rawPayload);
+  } catch (error: any) {
+    console.warn(`[MQTT] Rejected non-JSON payload on ${topic}: ${error?.message ?? error}`);
+    return;
+  }
+
+  const normalized = normalizeTelemetry(parsedJson);
+  if (!normalized) {
+    console.warn("[MQTT] Rejected malformed telemetry payload.");
+    return;
+  }
+
+  console.log(
+    `[MQTT] Normalised ${normalized.format} JSON payload (room=${normalized.roomId}, devices=${normalized.devices.length})`
+  );
+  applyDeviceUpdates(normalized.roomId, normalized.devices, "legacy telemetry");
+}
+
+function requireConnectedClient(): mqtt.MqttClient {
+  if (!mqttClient || !mqttClient.connected) {
+    throw new Error("MQTT broker is disconnected. Hardware command was not sent.");
+  }
+  return mqttClient;
+}
+
+function publishAsync(topic: string, payload: string): Promise<void> {
+  const client = requireConnectedClient();
+  return new Promise((resolve, reject) => {
+    client.publish(topic, payload, { retain: true }, (error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+}
+
+export async function publishHardwareDeviceCommand(
+  deviceId: string,
+  status: "on" | "off"
+): Promise<{ topic: string; payload: "ON" | "OFF" }> {
+  const shortId = shortDeviceIdFromCanonical(deviceId);
+  if (!shortId || !deviceId.startsWith(`${HARDWARE_ROOM_ID}-`)) {
+    throw new Error(`Device ${deviceId} is not mapped to the hardware room.`);
+  }
+
+  const payload = status === "on" ? "ON" : "OFF";
+  const topic = `${hardwareTopicPrefix}/${shortId}/set`;
+  await publishAsync(topic, payload);
+  console.log(`[MQTT] Published hardware device command -> ${topic} = ${payload}`);
+  return { topic, payload };
+}
+
+export async function publishHardwareRoomCommand(
+  roomId: string,
+  status: "on" | "off"
+): Promise<{ topic: string; payload: "ON" | "OFF" }> {
+  if (roomId !== HARDWARE_ROOM_ID) {
+    throw new Error(`Room ${roomId} is not mapped to the hardware controller.`);
+  }
+
+  const payload = status === "on" ? "ON" : "OFF";
+  const topic = `${hardwareTopicPrefix}/master/set`;
+  await publishAsync(topic, payload);
+  console.log(`[MQTT] Published hardware room command -> ${topic} = ${payload}`);
+  return { topic, payload };
+}
 
 export const initMqttClient = (): void => {
   const brokerUrl = env.MQTT_BROKER_URL;
   if (!brokerUrl) {
-    console.log(
-      "[MQTT] MQTT_BROKER_URL is not configured. Telemetry subscriber is disabled."
-    );
+    console.log("[MQTT] MQTT_BROKER_URL is not configured. MQTT bridge is disabled.");
     return;
   }
 
@@ -171,171 +350,43 @@ export const initMqttClient = (): void => {
   if (env.MQTT_PASSWORD) options.password = env.MQTT_PASSWORD;
 
   try {
-    const client = mqtt.connect(brokerUrl, options);
+    mqttClient = mqtt.connect(brokerUrl, options);
 
-    client.on("connect", () => {
+    mqttClient.on("connect", () => {
       console.log("[MQTT] Connected successfully to broker.");
-      client.subscribe(env.MQTT_TOPIC, (err) => {
-        if (err) {
+      const subscriptions = [env.MQTT_TOPIC, `${hardwareTopicPrefix}/#`];
+      mqttClient?.subscribe(subscriptions, (error) => {
+        if (error) {
           console.error(
-            `[MQTT] Failed to subscribe to topic ${env.MQTT_TOPIC}:`,
-            err.message
+            `[MQTT] Failed to subscribe to MQTT topics ${subscriptions.join(", ")}:`,
+            error.message
           );
         } else {
-          console.log(`[MQTT] Subscribed to topic: ${env.MQTT_TOPIC}`);
+          console.log(`[MQTT] Subscribed to topics: ${subscriptions.join(", ")}`);
         }
       });
     });
 
-    client.on("message", (topic, message) => {
-      let rawPayload: string;
-      try {
-        rawPayload = message.toString();
-      } catch (e: any) {
-        console.error(`[MQTT] Could not decode message bytes: ${e?.message ?? e}`);
-        return;
-      }
+    mqttClient.on("message", (topic, message) => {
+      const rawPayload = message.toString();
       console.log(`[MQTT] Message received on topic ${topic}: ${rawPayload}`);
 
-      let parsedJson: unknown;
       try {
-        parsedJson = JSON.parse(rawPayload);
-      } catch (e: any) {
-        console.warn(
-          `[MQTT] Rejected non-JSON payload on ${topic}: ${e?.message ?? e}`
-        );
-        return;
-      }
-
-      let normalized;
-      try {
-        normalized = normalizeTelemetry(parsedJson);
-      } catch (e: any) {
-        console.error(`[MQTT] Unexpected error normalising payload: ${e?.message ?? e}`);
-        return;
-      }
-      if (!normalized) {
-        console.warn(`[MQTT] Rejected malformed telemetry payload.`);
-        return;
-      }
-      console.log(
-        `[MQTT] Normalised ${normalized.format} payload (room=${normalized.roomId}, devices=${normalized.devices.length})`
-      );
-
-      try {
-        handleMqttTelemetry(normalized.roomId, normalized.devices);
-      } catch (e: any) {
-        console.error(`[MQTT] Error applying telemetry to state: ${e?.message ?? e}`);
+        if (handleHardwareTopicMessage(topic, rawPayload)) return;
+        handleJsonTelemetry(topic, rawPayload);
+      } catch (error: any) {
+        console.error(`[MQTT] Error handling topic ${topic}: ${error?.message ?? error}`);
       }
     });
 
-    client.on("error", (err) => {
-      console.error("[MQTT] Client connection error:", err.message);
+    mqttClient.on("error", (error) => {
+      console.error("[MQTT] Client connection error:", error.message);
     });
 
-    client.on("close", () => {
+    mqttClient.on("close", () => {
       console.log("[MQTT] Connection closed.");
     });
-  } catch (err: any) {
-    console.error("[MQTT] Fatal error initializing client:", err.message);
+  } catch (error: any) {
+    console.error("[MQTT] Fatal error initializing client:", error.message);
   }
 };
-
-// -----------------------------------------------------------------------------
-// Apply a normalised telemetry payload to the office state.
-// -----------------------------------------------------------------------------
-function handleMqttTelemetry(
-  roomId: string,
-  devices: Array<{ deviceId: string; status: "on" | "off" }>
-): void {
-  // Hard restriction: only Work Room 1 (work1) is fed by MQTT in this build.
-  // Drawing Room and Work Room 2 are owned by the simulator and the manual API.
-  if (roomId !== "work1") {
-    console.warn(
-      `[MQTT] Rejected telemetry for roomId "${roomId}" — only "work1" is accepted.`
-    );
-    return;
-  }
-
-  // Mark telemetry as received (sets online status / triggers socket emit).
-  const connectionTransitioned = officeStateService.setWokwiTelemetryReceived();
-  if (connectionTransitioned) {
-    console.log("[MQTT] Wokwi gateway transitioned OFFLINE -> ONLINE");
-    emitConnectionStatus({
-      source: "wokwi",
-      online: true,
-      lastSeen: new Date().toISOString(),
-    });
-  }
-
-  let stateChanged = false;
-  let appliedCount = 0;
-  let skippedCount = 0;
-
-  for (const d of devices) {
-    // Hard restriction: deviceId must be inside Work Room 1.
-    if (!d.deviceId.startsWith("work1-")) {
-      console.warn(
-        `[MQTT] Blocked device update for ${d.deviceId} — outside work1.`
-      );
-      skippedCount++;
-      continue;
-    }
-
-    const currentDevice = officeStateService.getDevice(d.deviceId);
-    if (!currentDevice) {
-      console.warn(`[MQTT] Unknown deviceId ${d.deviceId} — ignored.`);
-      skippedCount++;
-      continue;
-    }
-
-    if (currentDevice.status === d.status) {
-      console.log(
-        `[MQTT] No-op for ${d.deviceId} (already ${d.status}).`
-      );
-      continue;
-    }
-
-    try {
-      // Snapshot the previous status BEFORE flipping it (updateDeviceState
-      // mutates the device object in place, so reading currentDevice.status
-      // after the call would yield the new value).
-      const previousStatus = currentDevice.status;
-
-      // Record turn-off BEFORE flipping status so the kWh accumulator sees
-      // the full ON interval.
-      if (d.status === "off") {
-        powerCalculatorService.recordDeviceTurnOff(currentDevice);
-      }
-
-      const { device, changed } = officeStateService.updateDeviceState(
-        d.deviceId,
-        d.status
-      );
-      if (changed) {
-        stateChanged = true;
-        appliedCount++;
-        console.log(
-          `[MQTT] ${device.deviceId}: ${previousStatus} -> ${device.status} (${device.currentWatt}W) — event persisted, device:changed emitted.`
-        );
-        emitDeviceChanged(device);
-      }
-    } catch (e: any) {
-      console.error(
-        `[MQTT] Error updating device ${d.deviceId}: ${e?.message ?? e}`
-      );
-      skippedCount++;
-    }
-  }
-
-  console.log(
-    `[MQTT] Payload applied: ${appliedCount} changed, ${skippedCount} skipped/blocked.`
-  );
-
-  if (stateChanged || connectionTransitioned) {
-    const usage = powerCalculatorService.getUsage();
-    alertService.evaluateAlerts();
-    emitUsageUpdated(usage);
-    console.log("[MQTT] usage:updated emitted; alerts re-evaluated.");
-  }
-}

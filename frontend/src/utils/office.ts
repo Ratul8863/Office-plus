@@ -3,10 +3,33 @@ import type { Device, RoomId, Usage } from "@/types";
 export const FAN_WATT = 60;
 export const LIGHT_WATT = 15;
 
-export const ROOM_META: Record<RoomId, { name: string; purpose: string; source: "wokwi" | "simulator" }> = {
-  drawing: { name: "Drawing Room", purpose: "Waiting area for guests and clients", source: "simulator" },
-  work1: { name: "Work Room 1", purpose: "Primary employee workspace", source: "wokwi" },
-  work2: { name: "Work Room 2", purpose: "Secondary employee workspace", source: "simulator" },
+export const ROOM_META: Record<
+  RoomId,
+  {
+    name: string;
+    purpose: string;
+    source: "wokwi" | "simulator";
+    sourceLabel: string;
+  }
+> = {
+  drawing: {
+    name: "Drawing Room",
+    purpose: "Physical ESP32 room synced with the hackathon control panel",
+    source: "wokwi",
+    sourceLabel: "Hardware Sync",
+  },
+  work1: {
+    name: "Work Room 1",
+    purpose: "Primary employee workspace running the digital simulator",
+    source: "simulator",
+    sourceLabel: "Digital Twin",
+  },
+  work2: {
+    name: "Work Room 2",
+    purpose: "Secondary employee workspace running the digital simulator",
+    source: "simulator",
+    sourceLabel: "Digital Twin",
+  },
 };
 
 export function formatWatt(w: number) {

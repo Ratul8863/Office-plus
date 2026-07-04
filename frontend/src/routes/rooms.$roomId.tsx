@@ -13,6 +13,8 @@ import { useOfficeStore, getRoomSummary } from "@/store/officeStore";
 import type { Device, RoomId } from "@/types";
 import { DeviceIcon } from "@/components/office/DeviceIcon";
 import { formatRelative, formatTime, formatWatt, ROOM_META } from "@/utils/office";
+import { roomApi } from "@/services/roomApi";
+import { toast } from "sonner";
 
 const VALID: RoomId[] = ["drawing", "work1", "work2"];
 
@@ -35,6 +37,7 @@ function RoomDetailPage() {
   const alerts = useMemo(() => allAlerts.filter((a) => a.roomId === rid), [allAlerts, rid]);
   const fans = roomDevices.filter((d) => d.type === "fan");
   const lights = roomDevices.filter((d) => d.type === "light");
+  const [masterBusy, setMasterBusy] = useState<"on" | "off" | null>(null);
 
   const [trend, setTrend] = useState<{ t: string; w: number }[]>(() =>
     Array.from({ length: 14 }, (_, i) => ({
@@ -51,6 +54,24 @@ function RoomDetailPage() {
   }, [summary.currentWatt]);
 
   const maxDeviceWatt = Math.max(...roomDevices.map((d) => d.ratedWatt), 1);
+  const isHardwareRoom = rid === "drawing";
+
+  async function handleMasterControl(status: "on" | "off") {
+    if (masterBusy) return;
+    setMasterBusy(status);
+    try {
+      const result = await roomApi.setMasterState(rid, status);
+      toast.success(
+        result.mode === "hardware-queued"
+          ? `Drawing Room master command sent (${status.toUpperCase()}).`
+          : `${meta.name} set to ${status.toUpperCase()}.`
+      );
+    } catch (error: any) {
+      toast.error(error?.message ?? "Room command failed.");
+    } finally {
+      setMasterBusy(null);
+    }
+  }
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
@@ -66,7 +87,7 @@ function RoomDetailPage() {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <span className="rounded-md border border-accent/40 bg-accent/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-accent">
-              {meta.source}
+              {meta.sourceLabel}
             </span>
             <span className="inline-flex items-center gap-1.5 text-xs text-emerald-300">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -75,6 +96,12 @@ function RoomDetailPage() {
           </div>
           <h1 className="mt-2 text-4xl lg:text-6xl font-bold tracking-tight">{meta.name}</h1>
           <p className="mt-1 text-lg text-muted-foreground">{meta.purpose}</p>
+          {isHardwareRoom && (
+            <p className="mt-3 max-w-2xl text-sm text-foreground/80">
+              This room mirrors the hackathon MQTT control panel: physical switches in the circuit,
+              the standalone web controller, and this dashboard all flow through the same backend.
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3 lg:w-[420px]">
@@ -191,6 +218,51 @@ function RoomDetailPage() {
 
         {/* Right column */}
         <div className="space-y-4 min-w-0">
+          {isHardwareRoom && (
+            <div className="rounded-2xl border border-cyan-400/30 bg-cyan-500/5 p-5 backdrop-blur">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200/80">
+                    Hackathon Bridge
+                  </div>
+                  <h2 className="mt-1 text-xl font-bold">Master Room Control</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Push one command to the ESP32 room bus and let the hardware publish the confirmed
+                    state back into OfficePulse.
+                  </p>
+                </div>
+                <div className="rounded-full border border-cyan-400/30 bg-background/50 px-3 py-1 text-[11px] font-mono text-cyan-200">
+                  MQTT · smartoffice/drawing
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <button
+                  onClick={() => handleMasterControl("on")}
+                  disabled={masterBusy !== null}
+                  className="rounded-xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm font-bold text-emerald-200 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {masterBusy === "on" ? "Sending..." : "All Lights + Fans ON"}
+                </button>
+                <button
+                  onClick={() => handleMasterControl("off")}
+                  disabled={masterBusy !== null}
+                  className="rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-200 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {masterBusy === "off" ? "Sending..." : "All Lights + Fans OFF"}
+                </button>
+              </div>
+              <div className="mt-4 grid gap-2 text-[11px] text-muted-foreground">
+                <div className="rounded-xl border border-border/40 bg-background/40 px-3 py-2">
+                  {"Web command -> backend -> MQTT -> ESP32 -> state echo -> live UI"}
+                </div>
+                <div className="rounded-xl border border-border/40 bg-background/40 px-3 py-2">
+                  Individual toggles below still work, but this panel recreates the standalone room
+                  website's master switch inside your main dashboard.
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="rounded-2xl border border-border/40 bg-card/40 p-5 backdrop-blur">
             <h2 className="mb-4 text-xl font-bold">Active Devices</h2>
             <ul className="space-y-3">
@@ -293,7 +365,7 @@ function RoomDetailPage() {
 
           <div className="rounded-2xl border border-border/40 bg-card/40 p-4 backdrop-blur text-xs text-muted-foreground flex items-center gap-2">
             <Radio className="h-3.5 w-3.5 text-accent" />
-            Telemetry source · <span className="text-foreground font-semibold">{meta.source}</span>
+            Telemetry source · <span className="text-foreground font-semibold">{meta.sourceLabel}</span>
           </div>
         </div>
       </div>

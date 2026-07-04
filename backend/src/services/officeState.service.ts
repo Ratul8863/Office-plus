@@ -35,7 +35,18 @@ class OfficeStateService {
    * Used during startup hydration from MongoDB.
    */
   public hydrate(devices: DeviceState[]): void {
-    this.devices = devices.map((d) => ({ ...d }));
+    const now = new Date().toISOString();
+    const persistedById = new Map(devices.map((device) => [device.deviceId, device]));
+    this.devices = INITIAL_DEVICES.map((config) => {
+      const persisted = persistedById.get(config.deviceId);
+      return {
+        ...config,
+        status: persisted?.status ?? "off",
+        currentWatt: persisted?.currentWatt ?? 0,
+        lastChanged: persisted?.lastChanged ?? now,
+        onSince: persisted?.onSince ?? null,
+      };
+    });
   }
 
   public getDevices(): DeviceState[] {

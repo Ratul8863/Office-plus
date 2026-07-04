@@ -18,7 +18,7 @@ export function DeviceGrid({ roomId }: { roomId?: RoomId }) {
           <div className="mb-4 flex items-center justify-between">
             <div>
               <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                {ROOM_META[items[0].roomId].source} source
+                {ROOM_META[items[0].roomId].sourceLabel}
               </div>
               <div className="text-lg font-bold">{room}</div>
             </div>

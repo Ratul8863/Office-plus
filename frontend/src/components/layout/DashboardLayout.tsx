@@ -206,7 +206,7 @@ export function DashboardLayout() {
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Wokwi (Work 1)</span>
+                <span className="text-muted-foreground">Hardware Bridge (Drawing)</span>
                 <span
                   className={`flex items-center gap-1.5 ${
                     wokwi ? "text-cyan-400" : "text-destructive"

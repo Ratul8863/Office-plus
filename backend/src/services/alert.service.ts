@@ -3,6 +3,7 @@ import { powerCalculatorService } from "./powerCalculator.service";
 import { env } from "../config/env";
 import { isAfterHours } from "../utils/time";
 import { persistenceService } from "./persistence.service";
+import { HARDWARE_ROOM_ID } from "../config/device.config";
 
 export interface Alert {
   id: string;
@@ -188,11 +189,11 @@ class AlertService {
       this.triggerAlert(
         "DEVICE_OFFLINE",
         "critical",
-        `Wokwi ESP32 gateway is offline. No telemetry received for ${env.WOKWI_OFFLINE_TIMEOUT_SECONDS} seconds.`,
-        "work1"
+        `Drawing Room hardware gateway is offline. No telemetry received for ${env.WOKWI_OFFLINE_TIMEOUT_SECONDS} seconds.`,
+        HARDWARE_ROOM_ID
       );
     } else {
-      this.resolveAlert("DEVICE_OFFLINE", "work1");
+      this.resolveAlert("DEVICE_OFFLINE", HARDWARE_ROOM_ID);
     }
   }
 }

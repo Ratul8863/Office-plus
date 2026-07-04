@@ -8,9 +8,11 @@ export interface DeviceConfig {
   source: "wokwi" | "simulator";
 }
 
+export const HARDWARE_ROOM_ID = "drawing" as const;
+
 export const ROOMS = [
-  { roomId: "drawing", roomName: "Drawing Room", source: "simulator" },
-  { roomId: "work1", roomName: "Work Room 1", source: "wokwi" },
+  { roomId: "drawing", roomName: "Drawing Room", source: "wokwi" },
+  { roomId: "work1", roomName: "Work Room 1", source: "simulator" },
   { roomId: "work2", roomName: "Work Room 2", source: "simulator" },
 ] as const;
 

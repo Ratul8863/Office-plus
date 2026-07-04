@@ -3,10 +3,11 @@ import { officeStateService } from "../services/officeState.service";
 import { powerCalculatorService } from "../services/powerCalculator.service";
 import { alertService } from "../services/alert.service";
 import { emitDeviceChanged, emitUsageUpdated } from "../socket/socketServer";
+import { publishHardwareDeviceCommand } from "../mqtt/mqttClient";
 
 const router = Router();
 
-router.post("/:deviceId/toggle", (req, res) => {
+router.post("/:deviceId/toggle", async (req, res) => {
   const { deviceId } = req.params;
   const { status } = req.body; // optional: "on" | "off" to force a specific state
 
@@ -25,6 +26,21 @@ router.post("/:deviceId/toggle", (req, res) => {
       targetStatus = status;
     } else {
       targetStatus = currentDevice.status === "on" ? "off" : "on";
+    }
+
+    if (currentDevice.source === "wokwi") {
+      const command = await publishHardwareDeviceCommand(deviceId, targetStatus);
+      res.json({
+        success: true,
+        data: {
+          mode: "hardware-queued",
+          device: currentDevice,
+          targetStatus,
+          topic: command.topic,
+          payload: command.payload,
+        },
+      });
+      return;
     }
 
     // Record turn off before changing status so we calculate kWh accurately
@@ -46,7 +62,11 @@ router.post("/:deviceId/toggle", (req, res) => {
 
     res.json({
       success: true,
-      data: device,
+      data: {
+        mode: "direct",
+        device,
+        targetStatus: device.status,
+      },
     });
   } catch (error: any) {
     res.status(500).json({

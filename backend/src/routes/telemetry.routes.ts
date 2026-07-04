@@ -4,6 +4,7 @@ import { officeStateService } from "../services/officeState.service";
 import { powerCalculatorService } from "../services/powerCalculator.service";
 import { alertService } from "../services/alert.service";
 import { emitDeviceChanged, emitUsageUpdated, emitConnectionStatus } from "../socket/socketServer";
+import { HARDWARE_ROOM_ID } from "../config/device.config";
 
 const router = Router();
 
@@ -32,11 +33,11 @@ router.post("/", (req, res) => {
 
   const { roomId, devices } = parsed.data;
 
-  // Enforce updating only Work Room 1 (work1)
-  if (roomId !== "work1") {
+  // Enforce updating only the hardware-backed room.
+  if (roomId !== HARDWARE_ROOM_ID) {
     res.status(400).json({
       success: false,
-      message: "Telemetry updates are restricted to Work Room 1 (roomId: work1).",
+      message: `Telemetry updates are restricted to ${HARDWARE_ROOM_ID} (roomId: ${HARDWARE_ROOM_ID}).`,
     });
     return;
   }
@@ -54,9 +55,11 @@ router.post("/", (req, res) => {
   }
 
   devices.forEach((d: any) => {
-    // Enforce that deviceId is within work1
-    if (!d.deviceId.startsWith("work1-")) {
-      console.warn(`[Telemetry] Blocked attempt to update device ${d.deviceId} in non-work1 room.`);
+    // Enforce that deviceId is within the configured hardware room.
+    if (!d.deviceId.startsWith(`${HARDWARE_ROOM_ID}-`)) {
+      console.warn(
+        `[Telemetry] Blocked attempt to update device ${d.deviceId} outside ${HARDWARE_ROOM_ID}.`
+      );
       return;
     }
 

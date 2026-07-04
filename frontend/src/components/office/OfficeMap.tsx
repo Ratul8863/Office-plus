@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useOfficeStore, getRoomSummary } from "@/store/officeStore";
 import type { Device, RoomId } from "@/types";
 import { DeviceIcon } from "./DeviceIcon";
-import { formatWatt } from "@/utils/office";
+import { formatWatt, ROOM_META } from "@/utils/office";
 
 function RoomBlock({ roomId, devices }: { roomId: RoomId; devices: Device[] }) {
   const allAlerts = useOfficeStore((s) => s.alerts);
@@ -53,18 +53,12 @@ function RoomBlock({ roomId, devices }: { roomId: RoomId; devices: Device[] }) {
       </div>
 
       <div className="mt-3 flex items-center justify-between text-[11px] text-muted-foreground">
-        <span className="uppercase tracking-wider">{ROOM_SOURCE[roomId]}</span>
+        <span className="uppercase tracking-wider">{ROOM_META[roomId].sourceLabel}</span>
         <span className="opacity-70 group-hover:opacity-100">View →</span>
       </div>
     </Link>
   );
 }
-
-const ROOM_SOURCE: Record<RoomId, string> = {
-  drawing: "Simulator",
-  work1: "Wokwi",
-  work2: "Simulator",
-};
 
 export function OfficeMap() {
   const devices = useOfficeStore((s) => s.devices);

@@ -84,7 +84,7 @@ function RoomsPage() {
 
               <div className="mt-3 flex items-center justify-between text-[11px]">
                 <span className="inline-flex items-center gap-1.5 text-muted-foreground uppercase tracking-wider">
-                  <Radio className="h-3 w-3" /> {meta.source}
+                  <Radio className="h-3 w-3" /> {meta.sourceLabel}
                 </span>
                 <span className="inline-flex items-center gap-1 text-primary opacity-80 group-hover:opacity-100">
                   Open room <ArrowRight className="h-3 w-3" />

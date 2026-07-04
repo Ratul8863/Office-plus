@@ -39,7 +39,7 @@ function DashboardPage() {
             ) : (
               <Chip icon={Server} tone="destructive" label="Backend Disconnected (Demo)" />
             )}
-            <Chip icon={Radio} tone="cyan" label="Wokwi + Simulator" />
+            <Chip icon={Radio} tone="cyan" label="Hardware + Simulator" />
             <Chip icon={Zap} tone="primary" label="Single Source of Truth" />
           </div>
           <h1 className="mt-3 text-3xl lg:text-4xl font-bold tracking-tight">OfficePulse</h1>

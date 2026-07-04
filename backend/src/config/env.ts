@@ -14,7 +14,7 @@ const envSchema = z.object({
     z.boolean()
   ).default(true),
   /**
-   * Toggle the random auto-tick engine for Drawing Room and Work Room 2.
+   * Toggle the random auto-tick engine for Work Room 1 and Work Room 2.
    * Source ("simulator") on devices is independent of this flag — devices
    * can still be controlled manually via the API regardless.
    */
@@ -31,6 +31,7 @@ const envSchema = z.object({
   MQTT_PASSWORD: z.string().optional().nullable().transform((val: string | null | undefined) => val === "" ? undefined : val),
   MQTT_CLIENT_ID: z.string().default("officepulse-backend"),
   MQTT_TOPIC: z.string().default("office/wokwi/work1/telemetry"),
+  MQTT_HARDWARE_TOPIC_PREFIX: z.string().default("smartoffice/drawing"),
   /**
    * Number of seconds with no telemetry before Wokwi is considered offline.
    * Triggers the DEVICE_OFFLINE alert and a connection:status socket event.

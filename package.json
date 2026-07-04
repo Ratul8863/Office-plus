@@ -1,8 +1,16 @@
 {
   "private": true,
   "scripts": {
-    "dev:frontend": "cd frontend && npm run dev",
-    "dev:backend": "cd backend && npm run dev",
-    "dev:bot": "cd bot && npm run dev"
+    "postinstall": "npm install --prefix backend",
+    "build": "npm --prefix backend run build",
+    "start": "npm --prefix backend start",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:bot": "npm --prefix bot run dev",
+    "dev:all": "concurrently -n frontend,backend -c cyan,green \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "build:all": "npm --prefix backend run build && npm --prefix frontend run build"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
   }
 }

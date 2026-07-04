@@ -6,7 +6,7 @@ export const Route = createFileRoute("/architecture")({
 });
 
 const NODES = [
-  { icon: Cpu, title: "Wokwi ESP32 Circuit", desc: "Physical device simulation firing telemetry", tone: "text-cyan-300 border-cyan-400/40" },
+  { icon: Cpu, title: "ESP32 Hardware Room", desc: "Hackathon room bridge firing live MQTT state", tone: "text-cyan-300 border-cyan-400/40" },
   { icon: Waves, title: "MQTT Broker", desc: "Low-latency pub/sub transport for telemetry", tone: "text-sky-300 border-sky-400/40" },
   { icon: Server, title: "Node.js Backend", desc: "Single source of truth · business logic", tone: "text-primary border-primary/40" },
   { icon: Database, title: "MongoDB Persistence", desc: "Time-series storage for devices, usage, alerts", tone: "text-emerald-300 border-emerald-400/40" },
@@ -28,7 +28,7 @@ function ArchitecturePage() {
 
       <div className="rounded-2xl border border-primary/40 bg-primary/5 p-6 backdrop-blur">
         <p className="text-base leading-relaxed text-foreground/90">
-          <span className="font-bold text-primary">The frontend never reads directly from Wokwi, MQTT, MongoDB, or Discord.</span>{" "}
+          <span className="font-bold text-primary">The frontend never reads directly from the ESP32 room, MQTT, MongoDB, or Discord.</span>{" "}
           The backend is the single source of truth. Both the dashboard and Discord bot use the same backend state.
         </p>
       </div>

@@ -8,7 +8,7 @@ import { env } from "../config/env";
  * Simulated-device source is decoupled from the random tick engine.
  *
  * - The device `source: "simulator"` label is set statically by
- *   `device.config.ts` for Drawing Room and Work Room 2 rooms. It is
+ *   `device.config.ts` for Work Room 1 and Work Room 2 rooms. It is
  *   unaffected by these flags.
  * - `ENABLE_SIMULATOR` (env) marks the simulator subsystem as the source
  *   of truth for those rooms. Today it does not change runtime behaviour
@@ -17,7 +17,7 @@ import { env } from "../config/env";
  *   random toggles automatically. It can also be flipped at runtime via
  *   the `/api/simulator/{start,stop}` endpoints.
  * - Manual `POST /api/devices/:deviceId/toggle` always works regardless
- *   of either flag — only work1 devices are reserved for Wokwi.
+ *   of either flag — only hardware-backed devices are reserved for MQTT.
  */
 
 let autoInterval: NodeJS.Timeout | null = null;
@@ -45,9 +45,7 @@ export function runRandomSimulatorTick(): {
   try {
     const devices = officeStateService.getDevices();
 
-    const simulatorDevices = devices.filter(
-      (d) => d.roomId === "drawing" || d.roomId === "work2"
-    );
+    const simulatorDevices = devices.filter((d) => d.source === "simulator");
     if (simulatorDevices.length === 0) return null;
 
     const randomIndex = Math.floor(Math.random() * simulatorDevices.length);
@@ -103,7 +101,7 @@ export function getSimulatorStatus(): SimulatorStatus {
     totalTicks,
     lastTickAt: lastTick ? lastTick.toISOString() : null,
     lastToggledDeviceId,
-    sourceRooms: ["drawing", "work2"],
+    sourceRooms: ["work1", "work2"],
   };
 }
 
@@ -133,7 +131,7 @@ export function startAutoSimulator(intervalMs?: number): {
 
   const ms = intervalMs ?? env.SIMULATOR_INTERVAL_MS;
   console.log(
-    `[Simulator] Starting auto-tick engine (Drawing Room & Work Room 2) every ${ms}ms.`
+    `[Simulator] Starting auto-tick engine (Work Room 1 & Work Room 2) every ${ms}ms.`
   );
   autoInterval = setInterval(() => {
     runRandomSimulatorTick();
