@@ -3,14 +3,14 @@ import { Server as HttpServer } from "http";
 import { officeStateService } from "../services/officeState.service";
 import { powerCalculatorService } from "../services/powerCalculator.service";
 import { alertService } from "../services/alert.service";
-import { getAllowedOrigins } from "../config/cors";
+import { isAllowedOrigin } from "../config/cors";
 
 let io: SocketIOServer | null = null;
 
 export const initSocketServer = (server: HttpServer): SocketIOServer => {
   io = new SocketIOServer(server, {
     cors: {
-      origin: getAllowedOrigins(),
+      origin: (origin, callback) => callback(null, isAllowedOrigin(origin)),
       methods: ["GET", "POST"],
       credentials: true,
     },

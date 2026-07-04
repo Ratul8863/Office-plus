@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { env } from "./config/env";
-import { getAllowedOrigins } from "./config/cors";
+import { getAllowedOrigins, isAllowedOrigin } from "./config/cors";
 import { getMongoState } from "./db/connectMongo";
 import { officeStateService } from "./services/officeState.service";
 import stateRoutes from "./routes/state.routes";
@@ -24,8 +24,7 @@ app.use(
   cors({
     origin: (origin, cb) => {
       // Same-origin / curl / server-to-server requests have no Origin header.
-      if (!origin) return cb(null, true);
-      if (allowedOrigins.has(origin)) return cb(null, true);
+      if (isAllowedOrigin(origin)) return cb(null, true);
 
       const err = new Error(
         `Origin ${origin} not allowed by CORS. Allowed origins: ${
