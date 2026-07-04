@@ -3,28 +3,14 @@ import { Server as HttpServer } from "http";
 import { officeStateService } from "../services/officeState.service";
 import { powerCalculatorService } from "../services/powerCalculator.service";
 import { alertService } from "../services/alert.service";
-import { env } from "../config/env";
+import { getAllowedOrigins } from "../config/cors";
 
 let io: SocketIOServer | null = null;
-
-const parseSocketOrigins = (): string[] | true => {
-  // Mirror the HTTP CORS allow-list so the Socket.IO handshake isn't blocked
-  // by the browser when the dev server runs on a non-default port.
-  const raw = String(env.CLIENT_URL).split(",").map((s) => s.trim()).filter(Boolean);
-  const set = new Set<string>(raw);
-  if (env.NODE_ENV !== "production") {
-    set.add("http://localhost:5173");
-    set.add("http://localhost:8080");
-    set.add("http://127.0.0.1:5173");
-    set.add("http://127.0.0.1:8080");
-  }
-  return Array.from(set);
-};
 
 export const initSocketServer = (server: HttpServer): SocketIOServer => {
   io = new SocketIOServer(server, {
     cors: {
-      origin: parseSocketOrigins(),
+      origin: getAllowedOrigins(),
       methods: ["GET", "POST"],
       credentials: true,
     },

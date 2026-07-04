@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { env } from "./config/env";
+import { getAllowedOrigins } from "./config/cors";
 import { getMongoState } from "./db/connectMongo";
 import { officeStateService } from "./services/officeState.service";
 import stateRoutes from "./routes/state.routes";
@@ -15,31 +16,7 @@ const app = express();
 
 const serverStartedAt = Date.now();
 
-/**
- * Build the set of origins the backend will accept on CORS requests.
- *
- * - Starts from `CLIENT_URL` in `.env`, which may be a single URL or a
- *   comma-separated list (e.g. `http://localhost:5173,http://localhost:8080`).
- * - In development, always permits the standard Vite defaults
- *   (`http://localhost:5173`, `http://localhost:8080`) so an alternate dev
- *   server port doesn't accidentally get blocked.
- */
-function parseAllowedOrigins(): Set<string> {
-  const allowed = new Set<string>();
-  for (const raw of String(env.CLIENT_URL).split(",")) {
-    const trimmed = raw.trim();
-    if (trimmed) allowed.add(trimmed);
-  }
-  if (env.NODE_ENV !== "production") {
-    allowed.add("http://localhost:5173");
-    allowed.add("http://localhost:8080");
-    allowed.add("http://127.0.0.1:5173");
-    allowed.add("http://127.0.0.1:8080");
-  }
-  return allowed;
-}
-
-const allowedOrigins = parseAllowedOrigins();
+const allowedOrigins = new Set(getAllowedOrigins());
 
 // Configure CORS to accept client connection. Echo the request origin so the
 // browser sees a matching Access-Control-Allow-Origin header.
@@ -49,7 +26,15 @@ app.use(
       // Same-origin / curl / server-to-server requests have no Origin header.
       if (!origin) return cb(null, true);
       if (allowedOrigins.has(origin)) return cb(null, true);
-      return cb(new Error(`Origin ${origin} not allowed by CORS`));
+
+      const err = new Error(
+        `Origin ${origin} not allowed by CORS. Allowed origins: ${
+          Array.from(allowedOrigins).join(", ") || "(none configured)"
+        }`
+      ) as Error & { status?: number };
+
+      err.status = 403;
+      return cb(err);
     },
     credentials: true,
   })
